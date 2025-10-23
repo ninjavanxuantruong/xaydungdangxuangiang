@@ -3,19 +3,23 @@
       <head>
         <meta charset="UTF-8" />
         <title>Dashboard</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link rel="stylesheet" href="/public/style.css" />
       </head>
       <body>
-        <header>
-          <h1>Danh sách PDF</h1>
+
+        <header class="site-header">
+          <h1 class="site-title">ĐẢNG ỦY XÃ XUÂN GIANG</h1>
           <% if (process.env.AUTH_MODE === "on") { %>
-            <a href="/logout" class="btn">Đăng xuất</a>
+            <a href="/logout" class="btn logout-btn">Đăng xuất</a>
           <% } %>
         </header>
 
         <main>
+          <h2 class="section-title">📚 Danh sách tài liệu</h2>
+
           <% if (!pdfs || pdfs.length === 0) { %>
-            <p>Không có PDF nào trong danh sách.</p>
+            <div class="error">Không có PDF nào trong danh sách.</div>
           <% } else { %>
             <ul class="pdf-list">
               <% pdfs.forEach(item => { %>
@@ -30,5 +34,6 @@
             </ul>
           <% } %>
         </main>
+
       </body>
       </html>
