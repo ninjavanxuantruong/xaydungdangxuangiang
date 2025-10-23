@@ -4,11 +4,15 @@
   <meta charset="UTF-8" />
   <title><%= name %></title>
   <link rel="stylesheet" href="/public/style.css" />
-  <!-- PDF.js từ CDN -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
 </head>
 <body>
-  
+
+  <!-- Alert tải tài liệu -->
+  <div id="loadingAlert" class="alert">
+    📄 Vui lòng chờ giây lát để tải tài liệu...
+  </div>
 
   <main>
     <div class="controls">
@@ -24,6 +28,12 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      // Alert tự tắt sau 3 giây
+      const loadingAlert = document.getElementById('loadingAlert');
+      setTimeout(() => {
+        loadingAlert.style.display = 'none';
+      }, 3000);
+
       const pdfUrl = "<%= link %>";
       const canvas = document.getElementById('pdfCanvas');
       const ctx = canvas.getContext('2d');
@@ -37,7 +47,6 @@
       let currentPage = 1;
       let scale = 1.2;
 
-      // ====== Voice setup ======
       let voices = [];
       let viVoice = null;
       function loadVoices() {
@@ -49,12 +58,10 @@
       loadVoices();
       speechSynthesis.onvoiceschanged = loadVoices;
 
-      // ====== Reading state ======
       let isReading = false;
       let isPaused = false;
       let currentUtterance = null;
 
-      // ====== PDF load ======
       const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
       loadingTask.promise.then(doc => {
         pdfDoc = doc;
@@ -71,12 +78,14 @@
       }
 
       async function renderPage(num) {
+        canvas.style.opacity = 0;
         const page = await pdfDoc.getPage(num);
         const viewport = page.getViewport({ scale });
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         await page.render({ canvasContext: ctx, viewport }).promise;
-        // Auto stop reading when changing page
+        canvas.style.opacity = 1;
+
         if (speechSynthesis.speaking) {
           speechSynthesis.cancel();
           isReading = false;
@@ -87,8 +96,6 @@
 
       async function readCurrentPage() {
         if (!pdfDoc) return;
-
-        // Nếu đang đọc thì bấm lại sẽ dừng hẳn
         if (isReading) {
           speechSynthesis.cancel();
           isReading = false;
@@ -131,7 +138,6 @@
         speechSynthesis.speak(currentUtterance);
       }
 
-      // ====== Event listeners ======
       prevBtn.addEventListener('click', async () => {
         if (!pdfDoc || currentPage <= 1) return;
         currentPage--;
@@ -148,21 +154,74 @@
 
       readBtn.addEventListener('click', readCurrentPage);
 
-      // Nút Stop = Pause/Resume
       stopBtn.addEventListener('click', () => {
         if (!speechSynthesis.speaking && !isPaused) return;
 
         if (!isPaused) {
-          // Đang đọc -> tạm dừng
           speechSynthesis.pause();
           isPaused = true;
           stopBtn.textContent = "▶️ Tiếp tục";
         } else {
-          // Đang tạm dừng -> tiếp tục
           speechSynthesis.resume();
           isPaused = false;
           stopBtn.textContent = "⏸️ Tạm dừng";
         }
+      });
+
+      // ====== Swipe detection (mobile) ======
+      let touchStartX = 0;
+
+      canvas.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+      });
+
+      canvas.addEventListener('touchend', async (e) => {
+        const touchEndX = e.changedTouches[0].screenX;
+        const deltaX = touchEndX - touchStartX;
+
+        if (Math.abs(deltaX) < 50) return;
+
+        if (deltaX < 0 && currentPage < pdfDoc.numPages) {
+          currentPage++;
+          await renderPage(currentPage);
+          updatePageInfo();
+        } else if (deltaX > 0 && currentPage > 1) {
+          currentPage--;
+          await renderPage(currentPage);
+          updatePageInfo();
+        }
+      });
+
+      // ====== Mouse drag detection (desktop) ======
+      let isDragging = false;
+      let dragStartX = 0;
+
+      canvas.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        dragStartX = e.screenX;
+      });
+
+      canvas.addEventListener('mouseup', async (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        const dragEndX = e.screenX;
+        const deltaX = dragEndX - dragStartX;
+
+        if (Math.abs(deltaX) < 50) return;
+
+        if (deltaX < 0 && currentPage < pdfDoc.numPages) {
+          currentPage++;
+          await renderPage(currentPage);
+          updatePageInfo();
+        } else if (deltaX > 0 && currentPage > 1) {
+          currentPage--;
+          await renderPage(currentPage);
+          updatePageInfo();
+        }
+      });
+
+      canvas.addEventListener('mouseleave', () => {
+        isDragging = false;
       });
     });
   </script>
