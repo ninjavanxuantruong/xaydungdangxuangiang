@@ -1,0 +1,34 @@
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Dashboard</title>
+        <link rel="stylesheet" href="/public/style.css" />
+      </head>
+      <body>
+        <header>
+          <h1>Danh sách PDF</h1>
+          <% if (process.env.AUTH_MODE === "on") { %>
+            <a href="/logout" class="btn">Đăng xuất</a>
+          <% } %>
+        </header>
+
+        <main>
+          <% if (!pdfs || pdfs.length === 0) { %>
+            <p>Không có PDF nào trong danh sách.</p>
+          <% } else { %>
+            <ul class="pdf-list">
+              <% pdfs.forEach(item => { %>
+                <li class="pdf-item">
+                  <span class="pdf-name"><%= item.name %></span>
+                  <a class="btn primary"
+                     href="/flipbook?url=<%= encodeURIComponent(item.url) %>&name=<%= encodeURIComponent(item.name) %>">
+                    Mở
+                  </a>
+                </li>
+              <% }) %>
+            </ul>
+          <% } %>
+        </main>
+      </body>
+      </html>
