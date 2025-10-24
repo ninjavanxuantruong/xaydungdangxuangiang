@@ -26,18 +26,22 @@ export async function fetchSheet(url) {
 }
 
 /**
- * Lấy danh sách PDF từ sheet
- * @returns {Promise<Array<{name: string, url: string}>>}
+ * Lấy danh sách tài liệu từ sheet
+ * @returns {Promise<Array<{type: string, name: string, url: string}>>}
  */
 export async function getPDFList() {
   const url = process.env.PDF_SHEET_URL;
   if (!url) return [];
   const records = await fetchSheet(url);
+
   // Chuẩn hóa dữ liệu
-  return records.map(r => ({
-    name: r.name || r.Name || "Untitled",
-    url: r.url || r.URL || r.link || ""
-  })).filter(item => item.url);
+  return records
+    .map(r => ({
+      type: r.type || r.Type || r.loai || "Khác",
+      name: r.name || r.Name || "Untitled",
+      url: r.url || r.URL || r.link || ""
+    }))
+    .filter(item => item.url);
 }
 
 /**
@@ -48,8 +52,10 @@ export async function getUsers() {
   const url = process.env.USER_SHEET_URL;
   if (!url) return [];
   const records = await fetchSheet(url);
-  return records.map(r => ({
-    username: r.username || r.user || r.email || "",
-    password: r.password || r.pass || ""
-  })).filter(u => u.username && u.password);
+  return records
+    .map(r => ({
+      username: r.username || r.user || r.email || "",
+      password: r.password || r.pass || ""
+    }))
+    .filter(u => u.username && u.password);
 }
