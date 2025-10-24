@@ -78,14 +78,35 @@
       }
 
       async function renderPage(num) {
-        canvas.style.opacity = 0;
         const page = await pdfDoc.getPage(num);
-        const viewport = page.getViewport({ scale });
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        await page.render({ canvasContext: ctx, viewport }).promise;
-        canvas.style.opacity = 1;
 
+        // scale cơ bản
+        const scale = 1.5;
+        const viewport = page.getViewport({ scale });
+
+        // xử lý độ phân giải màn hình (Retina, 4K…)
+        const outputScale = window.devicePixelRatio || 1;
+
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
+
+        // giữ kích thước hiển thị hợp lý
+        canvas.style.width = Math.floor(viewport.width) + "px";
+        canvas.style.height = Math.floor(viewport.height) + "px";
+
+        const transform = outputScale !== 1
+          ? [outputScale, 0, 0, outputScale, 0, 0]
+          : null;
+
+        const renderContext = {
+          canvasContext: ctx,
+          viewport: viewport,
+          transform: transform
+        };
+
+        await page.render(renderContext).promise;
+
+        // reset đọc khi đổi trang
         if (speechSynthesis.speaking) {
           speechSynthesis.cancel();
           isReading = false;
@@ -93,6 +114,7 @@
           stopBtn.textContent = "⏸️ Tạm dừng";
         }
       }
+
 
       async function readCurrentPage() {
         if (!pdfDoc) return;
