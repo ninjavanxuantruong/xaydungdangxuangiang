@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tài liệu - <%= type %></title>
+  <link rel="stylesheet" href="/public/style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { color: #333; }
+    ul { list-style: none; padding: 0; }
+    li { margin: 10px 0; }
+    a {
+      text-decoration: none;
+      color: #0066cc;
+      font-weight: bold;
+    }
+    a:hover { text-decoration: underline; }
+    .back {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+
+  <a href="/" class="back">⬅️ Quay lại danh sách loại</a>
+  <h1>Tài liệu thuộc loại: <%= type %></h1>
+
+  <% if (docs.length === 0) { %>
+    <p>❌ Không có tài liệu nào trong loại này.</p>
+  <% } else { %>
+    <ul>
+      <% docs.forEach(doc => { %>
+        <li>
+          <a href="/viewer?url=<%= encodeURIComponent(doc.url) %>&name=<%= encodeURIComponent(doc.name) %>">
+            📄 <%= doc.name %>
+          </a>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+
+</body>
+</html>
