@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= name %></title>
+  <link rel="stylesheet" href="/public/style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body>
+
+  <header>
+    <h1><%= name %></h1>
+    <div class="controls">
+      <button class="btn primary" id="readBtn">🔊 Đọc tài liệu</button>
+      <button class="btn" id="stopBtn">⏸️ Tạm dừng</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="docContent" class="doc-content">
+      <%- content %>
+    </div>
+  </main>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const readBtn = document.getElementById("readBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const docContent = document.getElementById("docContent");
+
+      let voices = [];
+      let viVoice = null;
+      function loadVoices() {
+        voices = speechSynthesis.getVoices() || [];
+        viVoice = voices.find(v => v.lang.toLowerCase() === "vi-vn")
+               || voices.find(v => v.lang.toLowerCase().startsWith("vi"))
+               || null;
+      }
+      loadVoices();
+      speechSynthesis.onvoiceschanged = loadVoices;
+
+      let isReading = false;
+      let isPaused = false;
+      let currentUtterance = null;
+
+      function readDoc() {
+        if (isReading) {
+          speechSynthesis.cancel();
+          isReading = false;
+          isPaused = false;
+          stopBtn.textContent = "⏸️ Tạm dừng";
+          return;
+        }
+
+        const text = docContent.innerText.trim();
+        if (!text) {
+          alert("Không có nội dung để đọc.");
+          return;
+        }
+
+        if (speechSynthesis.speaking) {
+          speechSynthesis.cancel();
+        }
+
+        currentUtterance = new SpeechSynthesisUtterance(text);
+        currentUtterance.lang = "vi-VN";
+        if (viVoice) currentUtterance.voice = viVoice;
+        currentUtterance.rate = 1;
+        currentUtterance.pitch = 1;
+
+        currentUtterance.onend = () => {
+          isReading = false;
+          isPaused = false;
+          stopBtn.textContent = "⏸️ Tạm dừng";
+        };
+
+        isReading = true;
+        isPaused = false;
+        speechSynthesis.speak(currentUtterance);
+      }
+
+      readBtn.addEventListener("click", readDoc);
+
+      stopBtn.addEventListener("click", () => {
+        if (!speechSynthesis.speaking && !isPaused) return;
+
+        if (!isPaused) {
+          speechSynthesis.pause();
+          isPaused = true;
+          stopBtn.textContent = "▶️ Tiếp tục";
+        } else {
+          speechSynthesis.resume();
+          isPaused = false;
+          stopBtn.textContent = "⏸️ Tạm dừng";
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>
