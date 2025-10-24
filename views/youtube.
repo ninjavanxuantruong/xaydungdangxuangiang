@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= name %></title>
+  <link rel="stylesheet" href="/public/style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    iframe {
+      width: 90vw;
+      height: 50.6vw; /* tỷ lệ 16:9 */
+      max-width: 1280px;
+      max-height: 720px;
+      border: 0;
+    }
+    @media (max-width: 600px) {
+      iframe {
+        width: 100vw;
+        height: 56.25vw; /* tỷ lệ 16:9 cho mobile */
+      }
+    }
+  </style>
+</head>
+<body>
+  <iframe
+    src="<%= link %>"
+    title="YouTube video player"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    allowfullscreen>
+  </iframe>
+</body>
+</html>
