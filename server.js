@@ -47,23 +47,54 @@ function requireLogin(req, res, next) {
 // ====== Utils ======
 function convertDriveLink(link) {
   if (!link) return null;
-  // Link dạng https://drive.google.com/file/d/<ID>/view?usp=sharing
+  // Google Drive file link -> direct download
   const match = link.match(/\/d\/([^/]+)\//);
   if (match && match[1]) {
     return `https://drive.google.com/uc?export=download&id=${match[1]}`;
   }
-  // Nếu đã là link uc?export=download thì giữ nguyên
   if (link.includes("uc?export=download")) return link;
   return link;
 }
 
-// getPDFList wrapper: tự convert link
-async function getPDFList() {
+// Trả về danh sách file, tự convert các link phổ biến
+async function getFileList() {
   const rows = await rawGetPDFList();
-  return rows.map((r) => ({
-    name: r.name,
-    url: convertDriveLink(r.url),
-  }));
+  return rows.map((r) => {
+    let url = r.url || "";
+    // PDF trên Google Drive
+    if (url.includes("drive.google.com/file")) {
+      url = convertDriveLink(url);
+    }
+    // Google Docs (Word) -> để nguyên URL, sẽ export PDF trong /viewer
+    return { name: r.name, url };
+  });
+}
+function convertYouTubeLink(inputUrl) {
+  try {
+    const u = new URL(inputUrl);
+    let videoId = null;
+
+    // watch?v=...
+    if (u.searchParams.get("v")) {
+      videoId = u.searchParams.get("v");
+    }
+
+    // youtu.be/<id>
+    if (!videoId && u.hostname.includes("youtu.be")) {
+      videoId = u.pathname.split("/")[1];
+    }
+
+    // shorts/<id>
+    if (!videoId && u.pathname.includes("/shorts/")) {
+      videoId = u.pathname.split("/shorts/")[1];
+    }
+
+    if (!videoId) return null;
+
+    return `https://www.youtube.com/embed/${videoId}`;
+  } catch {
+    return null;
+  }
 }
 
 // ====== Auth routes ======
@@ -97,36 +128,79 @@ app.get("/logout", (req, res) => {
 // ====== Dashboard ======
 app.get("/", requireLogin, async (req, res) => {
   try {
-    const pdfs = await getPDFList();
+    const pdfs = await getFileList();
     res.render("dashboard", { pdfs });
   } catch (err) {
     console.error("Home error:", err);
-    res.status(500).send("Không tải được danh sách PDF");
+    res.status(500).send("Không tải được danh sách tài liệu");
   }
 });
 
-// ====== Flipbook ======
-app.get("/flipbook", requireLogin, (req, res) => {
+// ====== Viewer route (PDF / Google Docs -> PDF / YouTube) ======
+// ====== Viewer route (PDF / Google Docs -> PDF / YouTube) ======
+app.get("/viewer", requireLogin, async (req, res) => {
   const { url, name } = req.query;
-  if (!url) return res.status(400).send("Thiếu link PDF");
+  if (!url) return res.status(400).send("Thiếu link tài liệu");
 
-  // Nếu url là link Google Drive direct, lấy ID
-  const match = url.match(/id=([^&]+)/);
-  const id = match ? match[1] : null;
+  console.log("📥 Viewer request URL:", url);
 
-  // Nếu có ID thì render với link proxy /pdf/:id
-  const finalLink = id ? `/pdf/${id}` : url;
+  try {
+    // Google Docs (Word) -> export PDF để giữ phân trang
+    if (url.includes("docs.google.com/document")) {
+      const match = url.match(/\/d\/([^/]+)\//);
+      const fileId = match && match[1] ? match[1] : null;
+      if (!fileId) {
+        console.warn("⚠️ Không lấy được ID Google Docs từ URL:", url);
+        return res.status(400).send("Không xác định được tài liệu Google Docs");
+      }
+      const pdfUrl = `/pdf/${fileId}?type=gdoc`;
+      console.log("➡️ Google Docs -> PDF export:", pdfUrl);
+      return res.render("flipbook", { name: name || "Tài liệu Word (PDF)", link: pdfUrl });
+    }
 
-  res.render("flipbook", { name: name || "Flipbook", link: finalLink });
+    // PDF (file trực tiếp hoặc Google Drive PDF)
+    if (url.endsWith(".pdf") || url.includes("/pdf/") || url.includes("drive.google.com")) {
+      const idMatch = url.match(/id=([^&]+)/);
+      const id = idMatch ? idMatch[1] : null;
+      const finalLink = id ? `/pdf/${id}` : url;
+      console.log("➡️ PDF link:", finalLink);
+      return res.render("flipbook", { name: name || "Tài liệu PDF", link: finalLink });
+    }
+
+    // YouTube
+    if (url.includes("youtube.com") || url.includes("youtu.be")) {
+      console.log("➡️ Xử lý YouTube:", url);
+      const embedUrl = convertYouTubeLink(url);
+      if (!embedUrl) {
+        return res.status(400).send("Không lấy được video ID từ link YouTube");
+      }
+      return res.render("youtube", { name: name || "Video YouTube", link: embedUrl });
+    }
+
+    // Nếu không khớp loại nào
+    return res.status(400).send("Định dạng không được hỗ trợ");
+
+  } catch (err) {
+    console.error("❌ Viewer error:", err);
+    res.status(500).send("Không thể hiển thị tài liệu");
+  }
 });
 
-// ====== Proxy PDF ======
+
+// ====== Proxy PDF (Drive file hoặc Google Docs export) ======
 app.get("/pdf/:id", async (req, res) => {
   const fileId = req.params.id;
-  const url = `https://drive.google.com/uc?export=download&id=${fileId}`;
+  const isGDoc = req.query.type === "gdoc";
+
+  const url = isGDoc
+    ? `https://docs.google.com/document/d/${fileId}/export?format=pdf`
+    : `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+  console.log("🔗 Proxy PDF URL:", url);
+
   try {
     const response = await fetch(url);
-    if (!response.ok) throw new Error("Fetch failed");
+    if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Content-Type", "application/pdf");
     response.body.pipe(res);
