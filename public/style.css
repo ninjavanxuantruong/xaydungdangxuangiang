@@ -1,3 +1,6 @@
+/* =========================
+   Biến màu sắc & theme chung
+   ========================= */
 :root {
   --bg: #0f172a;
   --panel: #111827;
@@ -7,6 +10,9 @@
   --error: #ef4444;
 }
 
+/* =========================
+   Reset & cấu hình cơ bản
+   ========================= */
 * {
   box-sizing: border-box;
 }
@@ -25,6 +31,9 @@ body {
   flex-direction: column;
 }
 
+/* =========================
+   Layout chính (main container)
+   ========================= */
 main {
   flex: 1;
   display: flex;
@@ -35,6 +44,9 @@ main {
   padding: 0 16px;
 }
 
+/* =========================
+   Canvas (flipbook/pdf render)
+   ========================= */
 canvas {
   display: block;
   margin: auto;
@@ -46,6 +58,9 @@ canvas {
   transition: opacity 0.3s ease;
 }
 
+/* =========================
+   Typography cơ bản
+   ========================= */
 h1 {
   margin: 0 0 16px;
 }
@@ -58,6 +73,9 @@ a:hover {
   text-decoration: underline;
 }
 
+/* =========================
+   Nút bấm (button styles)
+   ========================= */
 .btn {
   padding: 8px 12px;
   border: 1px solid #334155;
@@ -77,6 +95,9 @@ a:hover {
   border-color: var(--accent);
 }
 
+/* =========================
+   Thông báo lỗi
+   ========================= */
 .error {
   background: var(--error);
   color: white;
@@ -85,6 +106,9 @@ a:hover {
   margin-bottom: 12px;
 }
 
+/* =========================
+   Form đăng nhập / input
+   ========================= */
 .form-group {
   margin-bottom: 12px;
   display: flex;
@@ -106,6 +130,9 @@ a:hover {
   margin-top: 20px;
 }
 
+/* =========================
+   Thanh điều khiển (controls)
+   ========================= */
 .controls {
   display: flex;
   gap: 8px;
@@ -119,7 +146,9 @@ a:hover {
   opacity: 0.8;
 }
 
-/* Dashboard list */
+/* =========================
+   Dashboard - danh sách PDF
+   ========================= */
 .pdf-list {
   list-style: none;
   padding: 0;
@@ -139,6 +168,8 @@ a:hover {
   font-weight: 600;
   color: var(--text);
 }
+
+/* Responsive cho PDF item trên mobile */
 @media (max-width: 600px) {
   .pdf-item {
     flex-direction: column;
@@ -146,6 +177,10 @@ a:hover {
     gap: 8px;
   }
 }
+
+/* =========================
+   Header trên dashboard
+   ========================= */
 .header-top {
   display: flex;
   justify-content: space-between;
@@ -154,6 +189,10 @@ a:hover {
   gap: 12px;
   margin-bottom: 16px;
 }
+
+/* =========================
+   Alert / thông báo nổi bật
+   ========================= */
 .alert {
   background: var(--accent);
   color: #0f172a;
@@ -171,8 +210,9 @@ a:hover {
   to { opacity: 1; transform: translateY(0); }
 }
 
-
-
+/* =========================
+   Site header (logo + tiêu đề + logout)
+   ========================= */
 .site-header {
   display: flex;
   justify-content: space-between;
@@ -193,6 +233,9 @@ a:hover {
   margin-left: auto;
 }
 
+/* =========================
+   Section title
+   ========================= */
 .section-title {
   font-size: 1.4rem;
   font-weight: 600;
@@ -200,6 +243,9 @@ a:hover {
   color: var(--accent);
 }
 
+/* =========================
+   PDF item (phiên bản chi tiết hơn)
+   ========================= */
 .pdf-item {
   display: flex;
   flex-direction: column;
@@ -217,6 +263,7 @@ a:hover {
   color: var(--text);
 }
 
+/* Responsive cho PDF item trên tablet/desktop */
 @media (min-width: 600px) {
   .pdf-item {
     flex-direction: row;
@@ -224,20 +271,65 @@ a:hover {
     align-items: center;
   }
 }
+#pdfCanvas {
+  display: block;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 960px;
+  height: auto;
+  background: var(--panel);
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+}
 
-
-
+/* =========================
+/* Nội dung tài liệu (docreader) - giữ nguyên chữ gốc, chỉ thêm khung và lề */
 .doc-content {
+  all: revert;               /* reset toàn bộ về mặc định (bỏ ảnh hưởng từ style.css) */
+  box-sizing: border-box;    /* đảm bảo padding không làm vỡ layout */
+
+  /* Khung hiển thị nhẹ nhàng */
   background: var(--panel);
   color: var(--text);
-  padding: 16px;
+  padding: 12px 20px;        /* lề trên/dưới 12px, trái/phải 20px */
   border-radius: 8px;
-  line-height: 1.6;
-  font-size: 1rem;
+
+  /* Không ép font/line-height — để nguyên như bản gốc */
+  /* (không set font-size, không set line-height) */
+
+  /* An toàn khi có từ quá dài/URL */
   overflow-wrap: break-word;
 }
 
+/* Tùy chọn: chuẩn hóa một số thẻ thường gặp mà Word/PDF xuất ra quá “căng” */
+.doc-content h1 { margin: 0 0 12px; }
+.doc-content h2 { margin: 0 0 10px; }
+.doc-content h3 { margin: 0 0 8px; }
+.doc-content p  { margin: 0 0 10px; }
+.doc-content ul, .doc-content ol { margin: 8px 0 12px; padding-left: 20px; }
 
+
+/* Áp dụng riêng cho màn hình dọc (portrait) */
+@media screen and (orientation: portrait) {
+  .doc-content {
+    font-size: 0.9rem;      /* giảm nhẹ cỡ chữ để mỗi dòng chứa nhiều ký tự hơn */
+    line-height: 1.4;       /* giảm khoảng cách dòng để bớt kéo dài */
+    padding: 10px 12px;     /* thu gọn lề trái/phải để tăng không gian ngang */
+  }
+}
+
+/* Khi quay ngang (landscape) thì giữ nguyên hoặc thoáng hơn */
+@media screen and (orientation: landscape) {
+  .doc-content {
+    font-size: 1rem;
+    line-height: 1.6;
+    padding: 16px 20px;
+  }
+}
+
+/* =========================
+   Youtube box (nhúng video)
+   ========================= */
 .youtube-box {
   position: relative;
   padding-bottom: 56.25%; /* Tỉ lệ 16:9 */
