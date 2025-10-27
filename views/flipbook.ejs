@@ -43,6 +43,8 @@
       const stopBtn = document.getElementById('stopBtn');
       const pageInfo = document.getElementById('pageInfo');
 
+      
+
       let pdfDoc = null;
       let currentPage = 1;
       let scale = 1.2;
@@ -91,8 +93,7 @@
         canvas.height = Math.floor(viewport.height * outputScale);
 
         // giữ kích thước hiển thị hợp lý
-        canvas.style.width = Math.floor(viewport.width) + "px";
-        canvas.style.height = Math.floor(viewport.height) + "px";
+        
 
         const transform = outputScale !== 1
           ? [outputScale, 0, 0, outputScale, 0, 0]
