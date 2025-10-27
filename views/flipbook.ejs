@@ -1,253 +1,253 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8" />
-  <title><%= name %></title>
-  <link rel="stylesheet" href="/public/style.css" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
-</head>
-<body>
+  <!DOCTYPE html>
+  <html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <title><%= name %></title>
+    <link rel="stylesheet" href="/public/style.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+  </head>
+  <body>
 
-  <!-- Alert tải tài liệu -->
-  <div id="loadingAlert" class="alert">
-    📄 Vui lòng chờ giây lát để tải tài liệu...
-  </div>
-
-  <main>
-    <div class="controls">
-      <button class="btn" id="prevBtn">⬅️ Trang trước</button>
-      <button class="btn" id="nextBtn">➡️ Trang sau</button>
-      <button class="btn primary" id="readBtn">🔊 Đọc trang</button>
-      <button class="btn" id="stopBtn">⏸️ Tạm dừng</button>
-      <span id="pageInfo" class="page-info"></span>
+    <div id="loadingAlert" class="alert">
+      📄 Vui lòng chờ giây lát để tải tài liệu...
     </div>
 
-    <canvas id="pdfCanvas"></canvas>
-  </main>
+    <main>
+      <div class="controls">
+        <button class="btn" id="prevBtn">⬅️ Trang trước</button>
+        <button class="btn" id="nextBtn">➡️ Trang sau</button>
+        <button class="btn primary" id="readBtn">🔊 Đọc trang</button>
+        <button class="btn" id="pauseBtn">⏸ Dừng</button>
+        <button class="btn" id="resumeBtn">▶️ Tiếp tục</button>
+        <span id="pageInfo" class="page-info"></span>
+      </div>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      // Alert tự tắt sau 3 giây
-      const loadingAlert = document.getElementById('loadingAlert');
-      setTimeout(() => {
-        loadingAlert.style.display = 'none';
-      }, 3000);
+      <canvas id="pdfCanvas"></canvas>
+    </main>
 
-      const pdfUrl = "<%= link %>";
-      const canvas = document.getElementById('pdfCanvas');
-      const ctx = canvas.getContext('2d');
-      const prevBtn = document.getElementById('prevBtn');
-      const nextBtn = document.getElementById('nextBtn');
-      const readBtn = document.getElementById('readBtn');
-      const stopBtn = document.getElementById('stopBtn');
-      const pageInfo = document.getElementById('pageInfo');
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const loadingAlert = document.getElementById('loadingAlert');
+        setTimeout(() => loadingAlert.style.display = 'none', 3000);
 
-      
+        const pdfUrl = "<%= link %>";
+        const canvas = document.getElementById('pdfCanvas');
+        const ctx = canvas.getContext('2d');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const readBtn = document.getElementById('readBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resumeBtn = document.getElementById('resumeBtn');
+        const pageInfo = document.getElementById('pageInfo');
 
-      let pdfDoc = null;
-      let currentPage = 1;
-      let scale = 1.2;
+        // Âm thanh lật trang
+        const flipSound = new Audio("https://raw.githubusercontent.com/ninjavanxuantruong/xaydungdangxuangiang/main/flipcard-91468.mp3");
+        flipSound.volume = 0.6;
+        flipSound.load();
 
-      let voices = [];
-      let viVoice = null;
-      function loadVoices() {
-        voices = speechSynthesis.getVoices() || [];
-        viVoice = voices.find(v => v.lang.toLowerCase() === 'vi-vn')
-               || voices.find(v => v.lang.toLowerCase().startsWith('vi'))
-               || null;
-      }
-      loadVoices();
-      speechSynthesis.onvoiceschanged = loadVoices;
-
-      let isReading = false;
-      let isPaused = false;
-      let currentUtterance = null;
-
-      const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
-      loadingTask.promise.then(doc => {
-        pdfDoc = doc;
-        renderPage(currentPage);
-        updatePageInfo();
-      }).catch(err => {
-        console.error('PDF load error:', err);
-        alert('Không thể tải PDF. Vui lòng kiểm tra link.');
-      });
-
-      function updatePageInfo() {
-        if (!pdfDoc) return;
-        pageInfo.textContent = `Trang ${currentPage} / ${pdfDoc.numPages}`;
-      }
-
-      async function renderPage(num) {
-        const page = await pdfDoc.getPage(num);
-
-        // scale cơ bản
-        const scale = 1.5;
-        const viewport = page.getViewport({ scale });
-
-        // xử lý độ phân giải màn hình (Retina, 4K…)
-        const outputScale = window.devicePixelRatio || 1;
-
-        canvas.width = Math.floor(viewport.width * outputScale);
-        canvas.height = Math.floor(viewport.height * outputScale);
-
-        // giữ kích thước hiển thị hợp lý
-        
-
-        const transform = outputScale !== 1
-          ? [outputScale, 0, 0, outputScale, 0, 0]
-          : null;
-
-        const renderContext = {
-          canvasContext: ctx,
-          viewport: viewport,
-          transform: transform
-        };
-
-        await page.render(renderContext).promise;
-
-        // reset đọc khi đổi trang
-        if (speechSynthesis.speaking) {
-          speechSynthesis.cancel();
-          isReading = false;
-          isPaused = false;
-          stopBtn.textContent = "⏸️ Tạm dừng";
+        // Unlock audio trên mobile
+        let audioCtx = null;
+        function unlockAudio() {
+          flipSound.play().then(() => {
+            flipSound.pause();
+            flipSound.currentTime = 0;
+          }).catch(()=>{});
+          if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          }
+          if (audioCtx.state === "suspended") {
+            audioCtx.resume();
+          }
+          document.removeEventListener("touchstart", unlockAudio);
+          document.removeEventListener("click", unlockAudio);
         }
-      }
+        document.addEventListener("touchstart", unlockAudio, { once: true });
+        document.addEventListener("click", unlockAudio, { once: true });
 
+        // PDF.js config
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-      async function readCurrentPage() {
-        if (!pdfDoc) return;
-        if (isReading) {
-          speechSynthesis.cancel();
-          isReading = false;
-          isPaused = false;
-          stopBtn.textContent = "⏸️ Tạm dừng";
-          return;
-        }
+        let pdfDoc = null;
+        let currentPage = 1;
 
-        const page = await pdfDoc.getPage(currentPage);
-        const textContent = await page.getTextContent();
-        const text = textContent.items.map(item => item.str).join(' ');
-        if (!text || text.trim().length === 0) {
-          alert('Trang này không có văn bản (có thể là ảnh scan).');
-          return;
-        }
-
-        if (speechSynthesis.speaking) {
-          speechSynthesis.cancel();
-        }
-
-        currentUtterance = new SpeechSynthesisUtterance(text);
-        currentUtterance.lang = 'vi-VN';
-        if (viVoice) currentUtterance.voice = viVoice;
-        currentUtterance.rate = 1;
-        currentUtterance.pitch = 1;
-
-        currentUtterance.onend = () => {
-          isReading = false;
-          isPaused = false;
-          stopBtn.textContent = "⏸️ Tạm dừng";
-        };
-        currentUtterance.onerror = () => {
-          isReading = false;
-          isPaused = false;
-          stopBtn.textContent = "⏸️ Tạm dừng";
-        };
-
-        isReading = true;
-        isPaused = false;
-        speechSynthesis.speak(currentUtterance);
-      }
-
-      prevBtn.addEventListener('click', async () => {
-        if (!pdfDoc || currentPage <= 1) return;
-        currentPage--;
-        await renderPage(currentPage);
-        updatePageInfo();
-      });
-
-      nextBtn.addEventListener('click', async () => {
-        if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
-        currentPage++;
-        await renderPage(currentPage);
-        updatePageInfo();
-      });
-
-      readBtn.addEventListener('click', readCurrentPage);
-
-      stopBtn.addEventListener('click', () => {
-        if (!speechSynthesis.speaking && !isPaused) return;
-
-        if (!isPaused) {
-          speechSynthesis.pause();
-          isPaused = true;
-          stopBtn.textContent = "▶️ Tiếp tục";
-        } else {
-          speechSynthesis.resume();
-          isPaused = false;
-          stopBtn.textContent = "⏸️ Tạm dừng";
-        }
-      });
-
-      // ====== Swipe detection (mobile) ======
-      let touchStartX = 0;
-
-      canvas.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-      });
-
-      canvas.addEventListener('touchend', async (e) => {
-        const touchEndX = e.changedTouches[0].screenX;
-        const deltaX = touchEndX - touchStartX;
-
-        if (Math.abs(deltaX) < 50) return;
-
-        if (deltaX < 0 && currentPage < pdfDoc.numPages) {
-          currentPage++;
-          await renderPage(currentPage);
+        const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
+        loadingTask.promise.then(doc => {
+          pdfDoc = doc;
+          renderPage(currentPage);
           updatePageInfo();
-        } else if (deltaX > 0 && currentPage > 1) {
+        }).catch(err => {
+          console.error('PDF load error:', err);
+          alert('Không thể tải PDF. Vui lòng kiểm tra link.');
+        });
+
+        function updatePageInfo() {
+          if (!pdfDoc) return;
+          pageInfo.textContent = `Trang ${currentPage} / ${pdfDoc.numPages}`;
+        }
+
+        async function renderPage(num) {
+          const page = await pdfDoc.getPage(num);
+          const scale = 1.5;
+          const viewport = page.getViewport({ scale });
+          const outputScale = window.devicePixelRatio || 1;
+
+          canvas.width = Math.floor(viewport.width * outputScale);
+          canvas.height = Math.floor(viewport.height * outputScale);
+
+          const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+          const renderContext = { canvasContext: ctx, viewport, transform };
+          await page.render(renderContext).promise;
+        }
+
+        // Stop audio khi sang trang mới
+        function stopAudio() {
+          if (audioCtx) {
+            audioCtx.close();
+            audioCtx = null;
+          }
+        }
+
+        // Đọc trang
+        async function readCurrentPage() {
+          if (!pdfDoc) return;
+          stopAudio(); // dừng trang cũ
+
+          const page = await pdfDoc.getPage(currentPage);
+          const textContent = await page.getTextContent();
+          let text = textContent.items.map(item => item.str).join(' ');
+
+          text = text.replace(/\s+/g, ' ').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+          if (!text) {
+            alert('Trang này không có văn bản (có thể là ảnh scan).');
+            return;
+          }
+
+          function splitByWords(str, maxLen) {
+            const words = str.split(' ');
+            const parts = [];
+            let current = '';
+            for (const w of words) {
+              if ((current + ' ' + w).trim().length > maxLen) {
+                if (current) parts.push(current.trim());
+                current = w;
+              } else {
+                current += (current ? ' ' : '') + w;
+              }
+            }
+            if (current) parts.push(current.trim());
+            return parts;
+          }
+
+          const chunks = splitByWords(text, 200);
+          console.log("🔎 Tổng số đoạn:", chunks.length);
+
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          let currentTime = audioCtx.currentTime;
+
+          async function fetchAudioBuffer(snippet) {
+            const url = `/tts?q=${encodeURIComponent(snippet)}`;
+            const resp = await fetch(url);
+            const arrayBuffer = await resp.arrayBuffer();
+            return await audioCtx.decodeAudioData(arrayBuffer);
+          }
+
+          for (let i = 0; i < chunks.length; i++) {
+            const buffer = await fetchAudioBuffer(chunks[i]);
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioCtx.destination);
+            source.start(currentTime);
+            currentTime += buffer.duration;
+            console.log(`▶️ Đã xếp đoạn ${i + 1}:`, chunks[i]);
+          }
+        }
+
+        // Nút điều khiển
+        prevBtn.addEventListener('click', async () => {
+          if (!pdfDoc || currentPage <= 1) return;
           currentPage--;
+          stopAudio();
           await renderPage(currentPage);
           updatePageInfo();
-        }
-      });
+          flipSound.currentTime = 0; flipSound.play();
+        });
 
-      // ====== Mouse drag detection (desktop) ======
-      let isDragging = false;
-      let dragStartX = 0;
-
-      canvas.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        dragStartX = e.screenX;
-      });
-
-      canvas.addEventListener('mouseup', async (e) => {
-        if (!isDragging) return;
-        isDragging = false;
-        const dragEndX = e.screenX;
-        const deltaX = dragEndX - dragStartX;
-
-        if (Math.abs(deltaX) < 50) return;
-
-        if (deltaX < 0 && currentPage < pdfDoc.numPages) {
+        nextBtn.addEventListener('click', async () => {
+          if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
           currentPage++;
+          stopAudio();
           await renderPage(currentPage);
           updatePageInfo();
-        } else if (deltaX > 0 && currentPage > 1) {
-          currentPage--;
-          await renderPage(currentPage);
-          updatePageInfo();
-        }
-      });
+          flipSound.currentTime = 0; flipSound.play();
+        });
 
-      canvas.addEventListener('mouseleave', () => {
-        isDragging = false;
-      });
-    });
-  </script>
+        readBtn.addEventListener('click', () => {
+          unlockAudio();
+          readCurrentPage();
+        });
 
-</body>
-</html>
+        pauseBtn.addEventListener('click', () => {
+          if (audioCtx && audioCtx.state === "running") audioCtx.suspend();
+        });
+        resumeBtn.addEventListener('click', () => {
+          if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+        });
+
+        // Swipe (mobile)
+        let touchStartX = 0;
+        canvas.addEventListener('touchstart', (e) => {
+          touchStartX = e.changedTouches[0].screenX;
+        });
+        canvas.addEventListener('touchend', async (e) => {
+          const touchEndX = e.changedTouches[0].screenX;
+          const deltaX = touchEndX - touchStartX;
+          if (Math.abs(deltaX) < 50) return;
+          if (deltaX < 0 && currentPage < pdfDoc.numPages) {
+            currentPage++;
+            stopAudio();
+            await renderPage(currentPage);
+            updatePageInfo();
+            flipSound.currentTime = 0; flipSound.play();
+          } else if (deltaX > 0 && currentPage > 1) {
+            currentPage--;
+            stopAudio();
+            await renderPage(currentPage);
+            updatePageInfo();
+            flipSound.currentTime = 0; flipSound.play();
+          }
+        });
+
+        // Mouse drag (desktop)
+              // Mouse drag (desktop)
+              let startX = 0;
+              canvas.addEventListener('mousedown', (e) => {
+                startX = e.clientX;
+              });
+              canvas.addEventListener('mouseup', async (e) => {
+                const endX = e.clientX;
+                const deltaX = endX - startX;
+                if (Math.abs(deltaX) < 80) return; // ngưỡng kéo
+                if (deltaX < 0 && currentPage < pdfDoc.numPages) {
+                  // kéo sang trái → trang sau
+                  currentPage++;
+                  stopAudio();
+                  await renderPage(currentPage);
+                  updatePageInfo();
+                  flipSound.currentTime = 0; 
+                  flipSound.play();
+                } else if (deltaX > 0 && currentPage > 1) {
+                  // kéo sang phải → trang trước
+                  currentPage--;
+                  stopAudio();
+                  await renderPage(currentPage);
+                  updatePageInfo();
+                  flipSound.currentTime = 0; 
+                  flipSound.play();
+                }
+              });
+              });
+              </script>
+
+              </body>
+              </html>
