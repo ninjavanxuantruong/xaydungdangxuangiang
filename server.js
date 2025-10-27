@@ -6,6 +6,8 @@ import { fileURLToPath } from "url";
 import fetch from "node-fetch";
 import { getPDFList as rawGetPDFList, getUsers } from "./services/sheets.js";
 
+
+
 dotenv.config();
 
 const app = express();
@@ -189,6 +191,49 @@ app.get("/pdf/:id", async (req, res) => {
     res.status(500).send("Không tải được PDF");
   }
 });
+
+// ====== TTS proxy (Google Translate) ======
+app.get("/tts", async (req, res) => {
+  try {
+    const q = req.query.q;
+    if (!q || !q.trim()) {
+      return res.status(400).send("Thiếu tham số q");
+    }
+
+    // Giới hạn độ dài để tránh bị từ chối
+    const text = q.trim().slice(0, 200);
+
+    const googleUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=vi&client=tw-ob`;
+
+    const response = await fetch(googleUrl, {
+      method: "GET",
+      headers: {
+        // Giả lập truy cập thật từ trình duyệt
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119 Safari/537.36",
+        "Referer": "https://translate.google.com/",
+        "Accept": "*/*",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google TTS fetch failed: ${response.status}`);
+    }
+
+    // Trả audio về cho client
+    res.setHeader("Content-Type", "audio/mpeg");
+    // Cho phép phát từ trang của anh (nếu cần dùng ở domain khác, tuỳ chỉnh lại)
+    res.setHeader("Access-Control-Allow-Origin", "*");
+
+    response.body.pipe(res);
+  } catch (err) {
+    console.error("TTS proxy error:", err);
+    res.status(500).send("Không lấy được audio TTS");
+  }
+});
+
+
+
 
 // ====== 404 ======
 app.use((req, res) => {
