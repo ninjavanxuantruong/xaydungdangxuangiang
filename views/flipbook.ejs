@@ -102,33 +102,40 @@
         pageInfo.textContent = `Trang ${currentPage} / ${pdfDoc.numPages}`;
       }
 
+      function resyncOverlayScale() {
+        // Tính lại scale theo kích thước HIỂN THỊ hiện tại của canvas
+        const scaleX = canvas.clientWidth  / canvas.width;
+        const scaleY = canvas.clientHeight / canvas.height;
+        highlightOverlay.style.transformOrigin = "top left";
+        highlightOverlay.style.transform = `scale(${scaleX}, ${scaleY})`;
+      }
+
+
       async function renderPage(num) {
         const page = await pdfDoc.getPage(num);
         const scale = 1.5;
         const viewport = page.getViewport({ scale });
         const dpr = window.devicePixelRatio || 1;
 
-        // Render vào pixel thật
         canvas.width  = Math.floor(viewport.width  * dpr);
         canvas.height = Math.floor(viewport.height * dpr);
 
-        const renderContext = {
-          canvasContext: ctx,
-          viewport,
-          transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null
-        };
+        const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
+        const renderContext = { canvasContext: ctx, viewport, transform };
         await page.render(renderContext).promise;
 
-        // Overlay theo pixel thật (GIỮ NGUYÊN như code cũ của Anh)
+        // Overlay theo pixel thật (giữ nguyên)
         highlightOverlay.style.width  = canvas.width + "px";
         highlightOverlay.style.height = canvas.height + "px";
 
-        // Scale overlay để khớp kích thước HIỂN THỊ của canvas
-        const scaleX = canvas.clientWidth  / canvas.width;
-        const scaleY = canvas.clientHeight / canvas.height;
-        highlightOverlay.style.transformOrigin = "top left";
-        highlightOverlay.style.transform = `scale(${scaleX}, ${scaleY})`;
+        // Xóa transform cũ rồi sync lại theo kích thước hiển thị hiện tại
+        highlightOverlay.style.transform = "none";
+        resyncOverlayScale();
+
+        // Tùy chọn: xóa highlight cũ sau khi render để tránh “box cũ” bị scale theo ảnh trước
+        // clearTextHighlight();
       }
+
 
 
       function stopAudio() {
@@ -172,15 +179,14 @@
         }
         return chunks;
       }
-      function drawChunkOverlayByItems(chunk, items, overlayEl /*, canvasWidth */) {
+      function drawChunkOverlayByItems(chunk, items, overlayEl) {
         overlayEl.innerHTML = "";
         if (!chunk) return;
 
-        const dpr = window.devicePixelRatio || 1; // vẽ theo pixel thật
+        const dpr = window.devicePixelRatio || 1;
 
         for (let idx = chunk.start; idx <= chunk.end; idx++) {
           const it = items[idx]; if (!it) continue;
-
           const box = document.createElement("div");
           box.className = "highlight-box";
           box.style.left   = (it.x     * dpr) + "px";
@@ -190,6 +196,7 @@
           overlayEl.appendChild(box);
         }
       }
+
 
 
       // ====== Đọc trang ======
@@ -322,6 +329,29 @@
           flipSound.play();
         }
       });
+
+      // Khi xoay ngang/dọc
+      window.addEventListener('orientationchange', () => {
+        if (!pdfDoc) return;
+        // Render lại trang để canvas và overlay khớp hướng mới
+        renderPage(currentPage).then(() => {
+          updatePageInfo();
+          // Nếu đang đọc thì chỉ sync lại overlay, không stop audio
+          if (audioCtx && audioCtx.state === "running") {
+            resyncOverlayScale();
+          }
+        });
+      });
+
+      // Khi thay đổi kích thước cửa sổ (một số máy chỉ bắn resize)
+      window.addEventListener('resize', () => {
+        if (!pdfDoc) return;
+        // Chỉ cần sync lại overlay theo kích thước hiển thị mới
+        resyncOverlayScale();
+      });
+
+
+      
       });
       </script>
 
