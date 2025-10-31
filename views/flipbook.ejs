@@ -1,359 +1,718 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8" />
-  <title><%= name %></title>
-  <link rel="stylesheet" href="/public/style.css" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
-  <style>
-    /* Thêm CSS highlight */
-    #highlightOverlay {
-      position:absolute;
-      top:0; left:0;
-      pointer-events:none;
-    }
-    .highlight-box {
-      position:absolute;
-      background:rgba(255,224,102,0.35);
-      border-radius:2px;
-    }
-    .page-container { position:relative; display:inline-block; }
-  </style>
-</head>
-<body>
-
-  <div id="loadingAlert" class="alert">
-    📄 Vui lòng chờ giây lát để tải tài liệu...
-  </div>
-
-  <main>
-    <div class="controls">
-      <button class="btn" id="prevBtn">⬅️ Trang trước</button>
-      <button class="btn" id="nextBtn">➡️ Trang sau</button>
-      <button class="btn primary" id="readBtn">🔊 Đọc trang</button>
-      <button class="btn" id="pauseBtn">⏸ Dừng</button>
-      <button class="btn" id="resumeBtn">▶️ Tiếp tục</button>
-      <span id="pageInfo" class="page-info"></span>
-    </div>
-
-    <!-- Bọc canvas trong container để overlay highlight -->
-    <div class="page-container">
-      <canvas id="pdfCanvas"></canvas>
-      <div id="highlightOverlay"></div>
-    </div>
-  </main>
-
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const loadingAlert = document.getElementById('loadingAlert');
-      setTimeout(() => loadingAlert.style.display = 'none', 3000);
-
-      const pdfUrl = "<%= link %>";
-      const canvas = document.getElementById('pdfCanvas');
-      const ctx = canvas.getContext('2d');
-      const prevBtn = document.getElementById('prevBtn');
-      const nextBtn = document.getElementById('nextBtn');
-      const readBtn = document.getElementById('readBtn');
-      const pauseBtn = document.getElementById('pauseBtn');
-      const resumeBtn = document.getElementById('resumeBtn');
-      const pageInfo = document.getElementById('pageInfo');
-      const highlightOverlay = document.getElementById('highlightOverlay');
-
-      const flipSound = new Audio("https://raw.githubusercontent.com/ninjavanxuantruong/xaydungdangxuangiang/main/flipcard-91468.mp3");
-      flipSound.volume = 0.6;
-      flipSound.load();
-
-      let audioCtx = null;
-      function unlockAudio() {
-        flipSound.play().then(() => {
-          flipSound.pause();
-          flipSound.currentTime = 0;
-        }).catch(()=>{});
-        if (!audioCtx) {
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === "suspended") {
-          audioCtx.resume();
-        }
-        document.removeEventListener("touchstart", unlockAudio);
-        document.removeEventListener("click", unlockAudio);
-      }
-      document.addEventListener("touchstart", unlockAudio, { once: true });
-      document.addEventListener("click", unlockAudio, { once: true });
-
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-      let pdfDoc = null;
-      let currentPage = 1;
-
-      const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
-      loadingTask.promise.then(doc => {
-        pdfDoc = doc;
-        renderPage(currentPage);
-        updatePageInfo();
-      }).catch(err => {
-        console.error('PDF load error:', err);
-        alert('Không thể tải PDF. Vui lòng kiểm tra link.');
-      });
-
-      function updatePageInfo() {
-        if (!pdfDoc) return;
-        pageInfo.textContent = `Trang ${currentPage} / ${pdfDoc.numPages}`;
-      }
-
-      function resyncOverlayScale() {
-        // Tính lại scale theo kích thước HIỂN THỊ hiện tại của canvas
-        const scaleX = canvas.clientWidth  / canvas.width;
-        const scaleY = canvas.clientHeight / canvas.height;
-        highlightOverlay.style.transformOrigin = "top left";
-        highlightOverlay.style.transform = `scale(${scaleX}, ${scaleY})`;
-      }
-
-
-      async function renderPage(num) {
-        const page = await pdfDoc.getPage(num);
-        const scale = 1.5;
-        const viewport = page.getViewport({ scale });
-        const dpr = window.devicePixelRatio || 1;
-
-        canvas.width  = Math.floor(viewport.width  * dpr);
-        canvas.height = Math.floor(viewport.height * dpr);
-
-        const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
-        const renderContext = { canvasContext: ctx, viewport, transform };
-        await page.render(renderContext).promise;
-
-        // Overlay theo pixel thật (giữ nguyên)
-        highlightOverlay.style.width  = canvas.width + "px";
-        highlightOverlay.style.height = canvas.height + "px";
-
-        // Xóa transform cũ rồi sync lại theo kích thước hiển thị hiện tại
-        highlightOverlay.style.transform = "none";
-        resyncOverlayScale();
-
-        // Tùy chọn: xóa highlight cũ sau khi render để tránh “box cũ” bị scale theo ảnh trước
-        // clearTextHighlight();
-      }
-
-
-
-      function stopAudio() {
-        clearTextHighlight();
-        if (audioCtx) {
-          audioCtx.close();
-          audioCtx = null;
-        }
-      }
-
-      // ====== Hàm highlight ======
-      function clearTextHighlight() {
-        highlightOverlay.innerHTML = "";
-      }
-      function getItemsWithBoxes(textContent, viewport) {
-        const items = [];
-        for (const item of textContent.items) {
-          const text = (item.str || "").trim();
-          if (!text) continue;
-          const [vx, vy] = viewport.convertToViewportPoint(item.transform[4], item.transform[5]);
-          const fontSize = Math.abs(item.transform[0] || item.height || 12);
-          const height = fontSize;
-          const width = item.width ? item.width * viewport.scale : text.length * fontSize * 0.5;
-          items.push({ text, x: vx, y: vy - height, width, height });
-        }
-        return items;
-      }
-      function buildItemChunks(items, maxCharsPerChunk = 200) {
-        const chunks = [];
-        let startIdx = 0, accLen = 0;
-        for (let i = 0; i < items.length; i++) {
-          const len = items[i].text.length + 1;
-          if (accLen + len > maxCharsPerChunk && startIdx < i) {
-            chunks.push({ start: startIdx, end: i - 1, text: items.slice(startIdx, i).map(it => it.text).join(" ") });
-            startIdx = i; accLen = 0;
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+        <meta charset="UTF-8" />
+        <title><%= name %></title>
+        <link rel="stylesheet" href="/public/style.css" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+        <style>
+          /* Highlight overlay */
+          #highlightOverlay {
+            position:absolute;
+            top:0; left:0;
+            pointer-events:none;
           }
-          accLen += len;
-        }
-        if (startIdx < items.length) {
-          chunks.push({ start: startIdx, end: items.length - 1, text: items.slice(startIdx).map(it => it.text).join(" ") });
-        }
-        return chunks;
-      }
-      function drawChunkOverlayByItems(chunk, items, overlayEl) {
-        overlayEl.innerHTML = "";
-        if (!chunk) return;
-
-        const dpr = window.devicePixelRatio || 1;
-
-        for (let idx = chunk.start; idx <= chunk.end; idx++) {
-          const it = items[idx]; if (!it) continue;
-          const box = document.createElement("div");
-          box.className = "highlight-box";
-          box.style.left   = (it.x     * dpr) + "px";
-          box.style.top    = (it.y     * dpr) + "px";
-          box.style.width  = (it.width * dpr) + "px";
-          box.style.height = (it.height* dpr) + "px";
-          overlayEl.appendChild(box);
-        }
-      }
+          .highlight-box {
+            position: absolute;
+            background: rgba(255, 224, 102, 0.2); /* giảm từ 0.35 xuống 0.2 */
+            border-radius: 2px;
+          }
 
 
+          /* Marker overlay */
+          #markerOverlay {
+            position:absolute;
+            top:0; left:0;
+            pointer-events:none;
+          }
+          .chunk-marker {
+            position:absolute;
+            pointer-events:auto;
+            z-index:20;
+            color:red;
+            font-size:14px;
+            cursor:pointer;
+            user-select:none;
+          }
 
-      // ====== Đọc trang ======
-      // ====== Đọc trang ======
-      async function readCurrentPage() {
-        if (!pdfDoc) return;
-        stopAudio();
+          .page-container { 
+            position:relative; 
+            display:inline-block; 
+          }
+          #chunkTimeline {
+            display: flex;
+            overflow-x: auto;
+            margin: 0;            /* bỏ margin để sát mép */
+            padding: 6px;
+            width: 100vw;         /* full viewport width */
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 0;     /* bỏ bo góc nếu muốn giống hẳn */
+            gap: 6px;
+            background: #fafafa;
+          }
 
-        const page = await pdfDoc.getPage(currentPage);
-        const scale = 1.5;
-        const viewport = page.getViewport({ scale });
-        const textContent = await page.getTextContent();
+          .chunk-block {
+            flex: 0 0 auto;
+            min-width: 32px;
+            padding: 6px 10px;
+            background: #eee;
+            border-radius: 3px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 14px;
+            text-align: center;
+            border: 1px solid #ddd;
+          }
+          .chunk-block.active {
+            background: #ffd966;
+            border-color: #e6c441;
+          }
 
-        // Lấy item + vị trí thật
-        const items = getItemsWithBoxes(textContent, viewport);
-        if (!items.length) {
-          alert('Trang này không có văn bản (có thể là ảnh scan).');
-          return;
-        }
-        const chunks = buildItemChunks(items, 200);
-        console.log("🔎 Tổng số đoạn:", chunks.length);
+        </style>
+      </head>
+      <body>
 
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        let currentTime = audioCtx.currentTime;
+        <div id="loadingAlert" class="alert">
+          📄 Vui lòng chờ giây lát để tải tài liệu...
+        </div>
 
-        async function fetchAudioBuffer(snippet) {
-          const url = `/tts?q=${encodeURIComponent(snippet)}`;
-          const resp = await fetch(url);
-          const arrayBuffer = await resp.arrayBuffer();
-          return await audioCtx.decodeAudioData(arrayBuffer);
-        }
+        <main>
+          <div class="controls">
+            <button class="btn" id="prevBtn">⬅️ Trang trước</button>
+            <button class="btn" id="nextBtn">➡️ Trang sau</button>
+            <button class="btn primary" id="readBtn">🔊 Đọc trang</button>
+            <button class="btn" id="pauseBtn">⏸ Dừng</button>
+            <button class="btn" id="resumeBtn">▶️ Tiếp tục</button>
+            <span id="pageInfo" class="page-info"></span>
+          </div>
 
-        for (let i = 0; i < chunks.length; i++) {
-          const buffer = await fetchAudioBuffer(chunks[i].text);
-          const source = audioCtx.createBufferSource();
-          source.buffer = buffer;
-          source.connect(audioCtx.destination);
-          source.start(currentTime);
+          <div id="chunkTimeline"></div>
 
-          // Highlight đúng lúc bắt đầu đọc đoạn i
-          const startMs = currentTime * 1000;
-          setTimeout(() => {
-            drawChunkOverlayByItems(chunks[i], items, highlightOverlay, canvas.width);
-          }, Math.max(0, startMs));
 
-          currentTime += buffer.duration;
-          console.log(`▶️ Đã xếp đoạn ${i + 1}:`, chunks[i].text);
-        }
-      }
+          <!-- Canvas + overlays -->
+          <div class="page-container">
+            <canvas id="pdfCanvas"></canvas>
+            <div id="highlightOverlay"></div>
+            <div id="markerOverlay"></div>
+          </div>
+        </main>
 
-      // ====== Nút điều khiển ======
-      prevBtn.addEventListener('click', async () => {
-        if (!pdfDoc || currentPage <= 1) return;
-        currentPage--;
-        stopAudio();
-        await renderPage(currentPage);
-        updatePageInfo();
-        flipSound.currentTime = 0; flipSound.play();
-      });
+        <script>
+        document.addEventListener('DOMContentLoaded', () => {
+          const loadingAlert = document.getElementById('loadingAlert');
+          setTimeout(() => loadingAlert.style.display = 'none', 3000);
 
-      nextBtn.addEventListener('click', async () => {
-        if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
-        currentPage++;
-        stopAudio();
-        await renderPage(currentPage);
-        updatePageInfo();
-        flipSound.currentTime = 0; flipSound.play();
-      });
+          const pdfUrl = "<%= link %>";
+          const canvas = document.getElementById('pdfCanvas');
+          const ctx = canvas.getContext('2d');
+          const prevBtn = document.getElementById('prevBtn');
+          const nextBtn = document.getElementById('nextBtn');
+          const readBtn = document.getElementById('readBtn');
+          const pauseBtn = document.getElementById('pauseBtn');
+          const resumeBtn = document.getElementById('resumeBtn');
+          const pageInfo = document.getElementById('pageInfo');
+          const highlightOverlay = document.getElementById('highlightOverlay');
+          const markerOverlay    = document.getElementById('markerOverlay');
 
-      readBtn.addEventListener('click', () => {
-        unlockAudio();
-        readCurrentPage();
-      });
+          const flipSound = new Audio("https://raw.githubusercontent.com/ninjavanxuantruong/xaydungdangxuangiang/main/flipcard-91468.mp3");
+          flipSound.volume = 0.6;
+          flipSound.load();
 
-      pauseBtn.addEventListener('click', () => {
-        if (audioCtx && audioCtx.state === "running") audioCtx.suspend();
-      });
-      resumeBtn.addEventListener('click', () => {
-        if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
-      });
+          let audioCtx = null;
+          function unlockAudio() {
+            flipSound.play().then(() => {
+              flipSound.pause();
+              flipSound.currentTime = 0;
+            }).catch(()=>{});
+            if (!audioCtx) {
+              audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === "suspended") {
+              audioCtx.resume();
+            }
+            document.removeEventListener("touchstart", unlockAudio);
+            document.removeEventListener("click", unlockAudio);
+          }
+          document.addEventListener("touchstart", unlockAudio, { once: true });
+          document.addEventListener("click", unlockAudio, { once: true });
 
-      // Swipe (mobile)
-      let touchStartX = 0;
-      canvas.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-      });
-      canvas.addEventListener('touchend', async (e) => {
-        const touchEndX = e.changedTouches[0].screenX;
-        const deltaX = touchEndX - touchStartX;
-        if (Math.abs(deltaX) < 50) return;
-        if (deltaX < 0 && currentPage < pdfDoc.numPages) {
-          currentPage++;
-          stopAudio();
-          await renderPage(currentPage);
-          updatePageInfo();
-          flipSound.currentTime = 0; flipSound.play();
-        } else if (deltaX > 0 && currentPage > 1) {
-          currentPage--;
-          stopAudio();
-          await renderPage(currentPage);
-          updatePageInfo();
-          flipSound.currentTime = 0; flipSound.play();
-        }
-      });
+          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-      // Mouse drag (desktop)
-      let startX = 0;
-      canvas.addEventListener('mousedown', (e) => {
-        startX = e.clientX;
-      });
-      canvas.addEventListener('mouseup', async (e) => {
-        const endX = e.clientX;
-        const deltaX = endX - startX;
-        if (Math.abs(deltaX) < 80) return; // ngưỡng kéo
-        if (deltaX < 0 && currentPage < pdfDoc.numPages) {
-          // kéo sang trái → trang sau
-          currentPage++;
-          stopAudio();
-          await renderPage(currentPage);
-          updatePageInfo();
-          flipSound.currentTime = 0; 
-          flipSound.play();
-        } else if (deltaX > 0 && currentPage > 1) {
-          // kéo sang phải → trang trước
-          currentPage--;
-          stopAudio();
-          await renderPage(currentPage);
-          updatePageInfo();
-          flipSound.currentTime = 0; 
-          flipSound.play();
-        }
-      });
+          let pdfDoc = null;
+          let currentPage = 1;
 
-      // Khi xoay ngang/dọc
-      window.addEventListener('orientationchange', () => {
-        if (!pdfDoc) return;
-        // Render lại trang để canvas và overlay khớp hướng mới
-        renderPage(currentPage).then(() => {
-          updatePageInfo();
-          // Nếu đang đọc thì chỉ sync lại overlay, không stop audio
-          if (audioCtx && audioCtx.state === "running") {
+          // Quản lý timeout highlight
+          let activeTimeouts = [];
+          let activeSources = []; // thêm mảng này
+
+          function clearAllHighlightTimeouts() {
+            activeTimeouts.forEach(id => clearTimeout(id));
+            activeTimeouts = [];
+          }
+
+          function stopAudio() {
+            // Dừng audio context
+            if (audioCtx) {
+              try { audioCtx.close(); } catch (e) { console.warn("AudioCtx close error:", e); }
+              audioCtx = null;
+            }
+
+            // Dừng tất cả source đang chạy
+            activeSources.forEach(src => {
+              try { src.stop(); } catch(e) {}
+            });
+            activeSources = [];
+
+            // Clear timeout highlight
+            activeTimeouts.forEach(id => clearTimeout(id));
+            activeTimeouts = [];
+
+            // Xoá highlight cũ
+            highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
+          }
+
+
+          const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
+          loadingTask.promise.then(doc => {
+            pdfDoc = doc;
+            renderPage(currentPage);
+            updatePageInfo();
+          }).catch(err => {
+            console.error('PDF load error:', err);
+            alert('Không thể tải PDF. Vui lòng kiểm tra link.');
+          });
+
+          function updatePageInfo() {
+            if (!pdfDoc) return;
+            pageInfo.textContent = `Trang ${currentPage} / ${pdfDoc.numPages}`;
+          }
+
+          function resyncOverlayScale() {
+            const scaleX = canvas.clientWidth  / canvas.width;
+            const scaleY = canvas.clientHeight / canvas.height;
+
+            // Highlight cần scale theo kích thước hiển thị
+            highlightOverlay.style.transformOrigin = "top left";
+            highlightOverlay.style.transform = `scale(${scaleX}, ${scaleY})`;
+
+            // Marker KHÔNG scale (đã dùng toạ độ pixel thật)
+            markerOverlay.style.transform = "none";
+          }
+
+
+
+          async function renderPage(num) {
+            const page = await pdfDoc.getPage(num);
+            const scale = 1.5;
+            const viewport = page.getViewport({ scale });
+            const dpr = window.devicePixelRatio || 1;
+
+            canvas.width  = Math.floor(viewport.width  * dpr);
+            canvas.height = Math.floor(viewport.height * dpr);
+
+            const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
+            const renderContext = { canvasContext: ctx, viewport, transform };
+            await page.render(renderContext).promise;
+
+            highlightOverlay.style.width  = canvas.width + "px";
+            highlightOverlay.style.height = canvas.height + "px";
+            markerOverlay.style.width     = canvas.width + "px";
+            markerOverlay.style.height    = canvas.height + "px";
+
             resyncOverlayScale();
+            highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
           }
-        });
-      });
 
-      // Khi thay đổi kích thước cửa sổ (một số máy chỉ bắn resize)
-      window.addEventListener('resize', () => {
-        if (!pdfDoc) return;
-        // Chỉ cần sync lại overlay theo kích thước hiển thị mới
-        resyncOverlayScale();
-      });
+          // (còn tiếp phần 2)
+          // ====== Hàm lấy text + highlight ======
+          function getItemsWithBoxes(textContent, viewport) {
+            const items = [];
+            for (const item of textContent.items) {
+              const text = (item.str || "").trim();
+              if (!text) continue;
+              const [vx, vy] = viewport.convertToViewportPoint(item.transform[4], item.transform[5]);
+              const fontSize = Math.abs(item.transform[0] || item.height || 12);
+              const height = fontSize;
+              const width = item.width ? item.width * viewport.scale : text.length * fontSize * 0.5;
+              items.push({ text, x: vx, y: vy - height, width, height });
+            }
+            return items;
+          }
 
 
-      
-      });
-      </script>
+          // Tách dấu câu ra thành item riêng để dễ nhận diện
+          function normalizeItems(items) {
+            const result = [];
+            for (const it of items) {
+              // Tách theo các dấu câu phổ biến
+              const parts = it.text.split(/([.,;:!?])/);
+              for (const p of parts) {
+                if (p.trim() !== "") {
+                  result.push({ ...it, text: p });
+                }
+              }
+            }
+            return result;
+          }
 
-      </body>
-      </html>
+
+          function buildItemChunks(items, maxCharsPerChunk = 200) {
+            const chunks = [];
+            let startIdx = 0;
+
+            const isPunctuationEnd = (text) => {
+              const t = text.trim();
+              return [".", ",", ";", ":", "!", "?"].includes(t) ||
+                     [".", ",", ";", ":", "!", "?"].some(p => t.endsWith(p)) ||
+                     t.includes("\n");
+            };
+
+            while (startIdx < items.length) {
+              let accLen = 0;
+              let endIdx = startIdx - 1;
+              let lastPunctIdx = -1;
+
+              for (let i = startIdx; i < items.length; i++) {
+                const word = items[i].text;
+                const addLen = word.length + (i > startIdx ? 1 : 0);
+
+                if (accLen + addLen > maxCharsPerChunk) {
+                  break;
+                }
+
+                accLen += addLen;
+                endIdx = i;
+
+                if (isPunctuationEnd(word)) {
+                  lastPunctIdx = i;
+                }
+              }
+
+              if (lastPunctIdx >= startIdx) {
+                endIdx = lastPunctIdx;
+              }
+
+              if (endIdx < startIdx) {
+                endIdx = startIdx;
+              }
+
+              // 👉 text cho highlight (giữ nguyên join cũ)
+              const textForHighlight = items.slice(startIdx, endIdx + 1)
+                .map(it => it.text)
+                .join(" ");
+
+              // 👉 text cho TTS (join thông minh, không thêm space trước dấu câu)
+              const textForTTS = items.slice(startIdx, endIdx + 1)
+                .map(it => it.text)
+                .reduce((acc, cur) => {
+                  const t = cur.trim();
+                  if ([ ".", ",", ";", ":", "!", "?" ].includes(t)) {
+                    return acc + t;
+                  } else {
+                    return acc ? acc + " " + cur : cur;
+                  }
+                }, "");
+
+              chunks.push({
+                start: startIdx,
+                end: endIdx,
+                text: textForHighlight, // dùng cho highlight
+                tts: textForTTS         // dùng cho TTS
+              });
+
+              // 👉 Log để kiểm tra
+              console.log(
+                `Chunk ${chunks.length - 1}: length=${textForTTS.length}, lastChar="${textForTTS.slice(-1)}"`
+              );
+
+              startIdx = endIdx + 1;
+            }
+
+            return chunks;
+          }
+
+
+
+
+
+          function drawChunkOverlayByItems(chunk, items, overlay) {
+            // Xoá mọi highlight cũ để luôn chỉ còn 1 lớp
+            overlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
+            if (!chunk) return;
+
+            // Dùng pixel thật của canvas để khớp với viewport đã render
+            const dpr = window.devicePixelRatio || 1;
+
+            for (let i = chunk.start; i <= chunk.end; i++) {
+              const it = items[i];
+              if (!it) continue;
+
+              const box = document.createElement("div");
+              box.className = "highlight-box";
+
+              // Nhân với dpr để khớp vị trí canvas
+              box.style.left   = (it.x     * dpr) + "px";
+              box.style.top    = (it.y     * dpr) + "px";
+              box.style.width  = (it.width * dpr) + "px";
+              box.style.height = (it.height* dpr) + "px";
+
+              overlay.appendChild(box);
+            }
+          }
+
+
+          // ====== Render timeline số đoạn (thay marker) ======
+          function renderChunkTimeline(chunks, items) {
+            const timeline = document.getElementById("chunkTimeline");
+            timeline.innerHTML = "";
+
+            chunks.forEach((chunk, i) => {
+              const block = document.createElement("div");
+              block.className = "chunk-block";
+              block.textContent = i + 1; // chỉ hiện số thứ tự
+
+              block.addEventListener("click", () => {
+                stopAudio();
+                timeline.querySelectorAll(".chunk-block").forEach(el => el.classList.remove("active"));
+                block.classList.add("active");
+                playChunkFromIndex(i, chunks, items);
+              });
+
+              timeline.appendChild(block);
+            });
+          }
+
+          function setActiveChunkBlock(index) {
+            const blocks = document.querySelectorAll("#chunkTimeline .chunk-block");
+            blocks.forEach(el => el.classList.remove("active"));
+            if (blocks[index]) blocks[index].classList.add("active");
+          }
+
+
+
+
+          // ====== Đọc toàn bộ trang ======
+          async function readCurrentPage() {
+            if (!pdfDoc) return;
+            stopAudio();
+
+            const page = await pdfDoc.getPage(currentPage);
+            const scale = 1.5;
+            const viewport = page.getViewport({ scale });
+            const textContent = await page.getTextContent();
+
+            let items = getItemsWithBoxes(textContent, viewport);
+            if (!items.length) {
+              alert('Trang này không có văn bản (có thể là ảnh scan).');
+              return;
+            }
+
+            // 👉 Chuẩn hoá items: tách dấu câu thành item riêng
+            items = normalizeItems(items);
+
+            // 👉 Chia chunk theo logic mới
+            const chunks = buildItemChunks(items, 200);
+
+            // 👉 Render highlight
+            // 👉 Render timeline số đoạn
+            renderChunkTimeline(chunks, items);
+
+
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            let stopRequested = false;
+            let currentSource = null;
+            let bufferQueue = [];
+
+            async function fetchBuffer(snippet) {
+              try {
+                const url = `/tts?q=${encodeURIComponent(snippet)}`;
+                console.log("🔊 Fetching TTS for:", snippet); // log để kiểm tra text gửi đi
+                const resp = await fetch(url);
+                if (!resp.ok) {
+                  throw new Error(`TTS request failed: ${resp.status}`);
+                }
+                const arrayBuffer = await resp.arrayBuffer();
+                return await audioCtx.decodeAudioData(arrayBuffer);
+              } catch (err) {
+                console.error("❌ fetchBuffer error:", err);
+                throw err;
+              }
+            }
+
+
+            async function prefillQueue(startIndex, count = 3) {
+              for (let j = 0; j < count && startIndex + j < chunks.length; j++) {
+                bufferQueue.push(await fetchBuffer(chunks[startIndex + j].text));
+              }
+            }
+
+            async function playOne(i) {
+              if (stopRequested || i >= chunks.length) return;
+
+              // nếu queue trống thì fetch
+              if (bufferQueue.length === 0) {
+                bufferQueue.push(await fetchBuffer(chunks[i].text));
+              }
+              const buffer = bufferQueue.shift();
+
+              const source = audioCtx.createBufferSource();
+              source.buffer = buffer;
+              source.connect(audioCtx.destination);
+
+              drawChunkOverlayByItems(chunks[i], items, highlightOverlay);
+              setActiveChunkBlock(i);
+
+              source.onended = () => {
+                if (!stopRequested) {
+                  // prefetch thêm để queue luôn đầy
+                  if (i + 3 < chunks.length) {
+                    fetchBuffer(chunks[i + 3].text).then(buf => bufferQueue.push(buf));
+                  }
+                  playOne(i + 1);
+                }
+              };
+
+              source.start();
+              currentSource = source;
+            }
+
+            // prefill queue trước khi phát
+            await prefillQueue(0, 3);
+            playOne(0);
+
+            stopAudio = function() {
+              stopRequested = true;
+              bufferQueue = [];
+              if (currentSource) {
+                try { currentSource.stop(); } catch(e) {}
+                currentSource = null;
+              }
+              if (audioCtx) {
+                try { audioCtx.close(); } catch(e) {}
+                audioCtx = null;
+              }
+              highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
+            }
+          }
+
+
+
+
+
+          // ====== Render marker ở lề ======
+          function renderChunkMarkers(chunks, items) {
+            markerOverlay.innerHTML = "";
+            const dpr = window.devicePixelRatio || 1;
+
+            const OFFSET_LEFT = -35;   // đẩy ra ngoài lề trái
+            const ICON_SIZE   = 28;    // kích thước vùng chạm
+
+            chunks.forEach((chunk, i) => {
+              const firstIt = items[chunk.start];
+              if (!firstIt) return;
+
+              const marker = document.createElement("div");
+              marker.className = "chunk-marker";
+              marker.textContent = "▶";
+
+              // Lấy toạ độ item đầu tiên
+              const leftPx = (firstIt.x + OFFSET_LEFT) * dpr;
+              const topPx  = (firstIt.y + firstIt.height / 2) * dpr;
+
+              marker.style.left = leftPx + "px";
+              marker.style.top  = (topPx - ICON_SIZE / 2) + "px";
+
+              marker.style.width = ICON_SIZE + "px";
+              marker.style.height = ICON_SIZE + "px";
+              marker.style.lineHeight = ICON_SIZE + "px";
+              marker.style.fontSize = "22px";
+
+              marker.addEventListener("click", () => {
+                playChunkFromIndex(i, chunks, items);
+              });
+
+              markerOverlay.appendChild(marker);
+            });
+          }
+
+
+
+
+          // ====== Đọc từ đoạn bất kỳ ======
+          async function playChunkFromIndex(startIndex, chunks, items) {
+            stopAudio();
+
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            let stopRequested = false;
+            let currentSource = null;
+            let bufferQueue = [];
+
+            async function fetchBuffer(snippet) {
+              const url = `/tts?q=${encodeURIComponent(snippet)}`;
+              const resp = await fetch(url);
+              const arrayBuffer = await resp.arrayBuffer();
+              return await audioCtx.decodeAudioData(arrayBuffer);
+            }
+
+            async function prefillQueue(startIndex, count = 3) {
+              for (let j = 0; j < count && startIndex + j < chunks.length; j++) {
+                bufferQueue.push(await fetchBuffer(chunks[startIndex + j].text));
+              }
+            }
+
+            async function playOne(i) {
+              if (stopRequested || i >= chunks.length) return;
+
+              if (bufferQueue.length === 0) {
+                bufferQueue.push(await fetchBuffer(chunks[i].text));
+              }
+              const buffer = bufferQueue.shift();
+
+              const source = audioCtx.createBufferSource();
+              source.buffer = buffer;
+              source.connect(audioCtx.destination);
+
+              drawChunkOverlayByItems(chunks[i], items, highlightOverlay);
+              setActiveChunkBlock(i);
+
+              source.onended = () => {
+                if (!stopRequested) {
+                  if (i + 3 < chunks.length) {
+                    fetchBuffer(chunks[i + 3].text).then(buf => bufferQueue.push(buf));
+                  }
+                  playOne(i + 1);
+                }
+              };
+
+              source.start();
+              currentSource = source;
+            }
+
+            await prefillQueue(startIndex, 3);
+            playOne(startIndex);
+
+            stopAudio = function() {
+              stopRequested = true;
+              bufferQueue = [];
+              if (currentSource) {
+                try { currentSource.stop(); } catch(e) {}
+                currentSource = null;
+              }
+              if (audioCtx) {
+                try { audioCtx.close(); } catch(e) {}
+                audioCtx = null;
+              }
+              highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
+            }
+          }
+
+
+
+            // ====== Nút điều khiển ======
+            prevBtn.addEventListener('click', async () => {
+              if (!pdfDoc || currentPage <= 1) return;
+              currentPage--;
+              stopAudio();
+              document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
+              await renderPage(currentPage);
+              updatePageInfo();
+              flipSound.currentTime = 0; flipSound.play();
+            });
+
+            nextBtn.addEventListener('click', async () => {
+              if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
+              currentPage++;
+              stopAudio();
+              document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
+              await renderPage(currentPage);
+              updatePageInfo();
+              flipSound.currentTime = 0; flipSound.play();
+            });
+
+            readBtn.addEventListener('click', () => {
+              unlockAudio();
+              readCurrentPage();
+            });
+
+            pauseBtn.addEventListener('click', () => {
+              if (audioCtx && audioCtx.state === "running") audioCtx.suspend();
+            });
+            resumeBtn.addEventListener('click', () => {
+              if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+            });
+
+            // Swipe (mobile)
+            let touchStartX = 0;
+            canvas.addEventListener('touchstart', (e) => {
+              touchStartX = e.changedTouches[0].screenX;
+            });
+            canvas.addEventListener('touchend', async (e) => {
+              const touchEndX = e.changedTouches[0].screenX;
+              const deltaX = touchEndX - touchStartX;
+              if (Math.abs(deltaX) < 50) return;
+              if (deltaX < 0 && currentPage < pdfDoc.numPages) {
+                currentPage++;
+                stopAudio();
+                document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
+                await renderPage(currentPage);
+                updatePageInfo();
+                flipSound.currentTime = 0; flipSound.play();
+              } else if (deltaX > 0 && currentPage > 1) {
+                currentPage--;
+                stopAudio();
+                document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
+                await renderPage(currentPage);
+                updatePageInfo();
+                flipSound.currentTime = 0; flipSound.play();
+              }
+            });
+
+            // Mouse drag (desktop)
+            let startX = 0;
+            canvas.addEventListener('mousedown', (e) => {
+              startX = e.clientX;
+            });
+            canvas.addEventListener('mouseup', async (e) => {
+              const endX = e.clientX;
+              const deltaX = endX - startX;
+              if (Math.abs(deltaX) < 80) return;
+              if (deltaX < 0 && currentPage < pdfDoc.numPages) {
+                currentPage++;
+                stopAudio();
+                document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
+                await renderPage(currentPage);
+                updatePageInfo();
+                flipSound.currentTime = 0; flipSound.play();
+              } else if (deltaX > 0 && currentPage > 1) {
+                currentPage--;
+                stopAudio();
+                document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
+                await renderPage(currentPage);
+                updatePageInfo();
+                flipSound.currentTime = 0; flipSound.play();
+              }
+            });
+
+            // Khi xoay ngang/dọc
+            window.addEventListener('orientationchange', () => {
+              if (!pdfDoc) return;
+              renderPage(currentPage).then(() => {
+                updatePageInfo();
+                if (audioCtx && audioCtx.state === "running") {
+                  resyncOverlayScale();
+                }
+              });
+            });
+
+            // Khi thay đổi kích thước cửa sổ
+            window.addEventListener('resize', () => {
+              if (!pdfDoc) return;
+              resyncOverlayScale();
+            });
+
+            }); // end DOMContentLoaded
+            </script>
+            </body>
+            </html>
