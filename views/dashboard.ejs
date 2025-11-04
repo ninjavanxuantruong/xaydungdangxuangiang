@@ -1,112 +1,143 @@
-      <!DOCTYPE html>
-      <html lang="vi">
-      <head>
-        <meta charset="UTF-8" />
-        <title>Dashboard</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link rel="stylesheet" href="/public/style.css" />
-        <style>
-          body {
-            margin: 0;
-            font-family: "Roboto", Arial, sans-serif;
-            background: #fff;
-          }
-          header.site-header {
-            display: flex;
-            align-items: center;
-            background: #cc0000; /* đỏ chủ đạo */
-            color: #fff;
-            padding: 10px 20px;
-          }
-          header .logo img {
-            height: 60px;
-            margin-right: 15px;
-          }
-          header .title h1 {
-            margin: 0;
-            font-size: 22px;
-            font-weight: bold;
-          }
-          header .title h2 {
-            margin: 0;
-            font-size: 16px;
-            font-weight: normal;
-          }
-          .logout-btn {
-            margin-left: auto;
-            color: #fff;
-            text-decoration: none;
-            font-weight: bold;
-            background: #a00000;
-            padding: 6px 12px;
-            border-radius: 4px;
-          }
-          main {
-            padding: 20px;
-          }
-          h2.section-title {
-            color: #cc0000;
-            margin-bottom: 20px;
-          }
-          ul.type-list {
-            list-style: none;
-            padding: 0;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-          }
-          li.type-item {
-            flex: 1 1 200px;
-          }
-          a.type-link {
-            display: block;
-            background: #d50000;
-            color: #fff;
-            text-align: center;
-            padding: 20px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: bold;
-            transition: background 0.3s;
-          }
-          a.type-link:hover {
-            background: #a00000;
-          }
-        </style>
-      </head>
-      <body>
+                <!DOCTYPE html>
+                <html lang="vi">
+                <head>
+                  <meta charset="UTF-8" />
+                  <title>Dashboard</title>
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                  <link rel="stylesheet" href="/public/style.css" />
+                  <style>
+                    body {
+                      margin: 0;
+                      font-family: "Roboto", Arial, sans-serif;
+                      background: #fff;
+                    }
+                    header.site-header {
+                      display: flex;
+                      align-items: center;
+                      background: #cc0000;
+                      color: #fff;
+                      padding: 10px 20px;
+                    }
+                    header .logo img {
+                      height: 60px;
+                      margin-right: 15px;
+                    }
+                    header .title h1 {
+                      margin: 0;
+                      font-size: 22px;
+                      font-weight: bold;
+                    }
+                    header .title h2 {
+                      margin: 0;
+                      font-size: 16px;
+                      font-weight: normal;
+                    }
+                    .logout-btn {
+                      margin-left: auto;
+                      color: #fff;
+                      text-decoration: none;
+                      font-weight: bold;
+                      background: #a00000;
+                      padding: 6px 12px;
+                      border-radius: 4px;
+                    }
+                    main {
+                      padding: 20px;
+                    }
+                    h2.section-title {
+                      color: #cc0000;
+                      margin-bottom: 20px;
+                    }
+                    ul.type-list {
+                      list-style: none;
+                      padding: 0;
+                      display: flex;
+                      flex-wrap: wrap;
+                      gap: 15px;
+                    }
+                    li.type-item {
+                      flex: 1 1 200px;
+                    }
+                    a.type-link {
+                      display: block;
+                      background: #d50000;
+                      color: #fff;
+                      text-align: center;
+                      padding: 20px;
+                      border-radius: 6px;
+                      text-decoration: none;
+                      font-weight: bold;
+                      transition: background 0.3s;
+                    }
+                    a.type-link:hover {
+                      background: #a00000;
+                    }
+                  </style>
+                </head>
+                <body>
 
-        <header class="site-header">
-          <div class="logo">
-            <img src="https://raw.githubusercontent.com/ninjavanxuantruong/xaydungdangxuangiang/main/logo-%20dang-cong-san-vietnam-vector-1.png" 
-                 alt="Logo Đảng" />
-          </div>
-          <div class="title">
-            <h1>PHẦM MỀM TƯ LIỆU ĐẢNG</h1>
-            <h2>ĐẢNG ỦY XÃ XUÂN GIANG</h2>
-          </div>
-          <% if (process.env.AUTH_MODE === "on") { %>
-            <a href="/logout" class="logout-btn">Đăng xuất</a>
-          <% } %>
-        </header>
+                  <header class="site-header">
+                    <div class="logo">
+                      <img src="https://raw.githubusercontent.com/ninjavanxuantruong/xaydungdangxuangiang/main/logo-%20dang-cong-san-vietnam-vector-1.png" 
+                           alt="Logo Đảng" />
+                    </div>
+                    <div class="title">
+                      <h1>PHẦN MỀM TƯ LIỆU ĐẢNG</h1>
+                      <h2>ĐẢNG ỦY XÃ XUÂN GIANG</h2>
+                    </div>
+                    <% if (process.env.AUTH_MODE === "on") { %>
+                      <a href="/logout" class="logout-btn">Đăng xuất</a>
+                    <% } %>
+                  </header>
 
-        <main>
-          <h2 class="section-title">📂 Danh sách loại tài liệu</h2>
+                  <main>
+                    <!-- Danh sách loại tài liệu -->
+                    <h2 class="section-title">📂 Danh sách loại tài liệu</h2>
+                    <% if (!types || types.length === 0) { %>
+                      <p>❌ Không có loại tài liệu nào.</p>
+                    <% } else { %>
+                      <ul class="type-list">
+                        <% types.forEach(t => { %>
+                          <li class="type-item">
+                            <a class="type-link" href="/type/<%= encodeURIComponent(t) %>">
+                              <%= t %>
+                            </a>
+                          </li>
+                        <% }) %>
+                      </ul>
+                    <% } %>
 
-          <% if (!types || types.length === 0) { %>
-            <p>❌ Không có loại tài liệu nào.</p>
-          <% } else { %>
-            <ul class="type-list">
-              <% types.forEach(t => { %>
-                <li class="type-item">
-                  <a class="type-link" href="/type/<%= encodeURIComponent(t) %>">
-                    <%= t %>
-                  </a>
-                </li>
-              <% }) %>
-            </ul>
-          <% } %>
-        </main>
+                    <!-- Danh sách báo cáo -->
+                    <h2 class="section-title">📝 Danh sách báo cáo</h2>
+                    <% if (!reports || reports.length === 0) { %>
+                      <p>❌ Không có báo cáo nào.</p>
+                    <% } else { %>
+                      <ul class="type-list">
+                        <% reports.forEach(r => { %>
+                          <li class="type-item">
+                            <a class="type-link" href="/reports/<%= encodeURIComponent(r.name) %>">
+                              <%= r.name %>
+                            </a>
+                          </li>
+                        <% }) %>
+                      </ul>
+                    <% } %>
 
-      </body>
-      </html>
+                    <!-- Kết quả báo cáo (chỉ Ban XDĐ mới thấy) -->
+                    <% if (user && user.unit === "Ban XDĐ" && submissions && submissions.length > 0) { %>
+                      <h2 class="section-title">📊 Kết quả báo cáo đã nộp</h2>
+                      <ul class="type-list">
+                        <% submissions.forEach(s => { %>
+                          <li class="type-item">
+                            <a class="type-link" href="/reports/results/<%= s.id %>">
+                              <strong><%= s.unit %></strong> - <%= s.reportName %><br/>
+                              <small>Thời gian: <%= new Date(s.submittedAt).toLocaleString("vi-VN") %></small>
+                            </a>
+                          </li>
+                        <% }) %>
+                      </ul>
+                    <% } %>
+                  </main>
+
+                </body>
+                </html>
