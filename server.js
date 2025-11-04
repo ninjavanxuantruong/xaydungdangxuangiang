@@ -41,10 +41,10 @@ app.get("/health", (req, res) => {
 
 // ====== Middleware check login ======
 function requireLogin(req, res, next) {
-  if (process.env.AUTH_MODE === "off") return next();
   if (req.session && req.session.user) return next();
   return res.redirect("/login");
 }
+
 
 // ====== Utils ======
 function convertDriveLink(link) {
@@ -87,28 +87,50 @@ function convertYouTubeLink(inputUrl) {
 }
 
 // ====== Auth routes ======
-app.get("/login", (req, res) => {
-  if (process.env.AUTH_MODE === "off") return res.redirect("/");
-  res.render("login", { error: null });
-});
-
-app.post("/login", async (req, res) => {
-  const { username, password } = req.body;
+app.get("/login", async (req, res) => {
   try {
     const users = await getUsers();
-    const found = users.find(
-      (u) => u.username === username && u.password === password
-    );
-    if (found) {
-      req.session.user = { username };
-      return res.redirect("/");
-    }
-    return res.render("login", { error: "Sai tài khoản hoặc mật khẩu" });
+    const units = users.map(u => u.name).filter(Boolean);
+    res.render("login", { error: null, units });
   } catch (err) {
-    console.error("Login error:", err);
-    return res.render("login", { error: "Lỗi server khi đăng nhập" });
+    console.error("GET /login error:", err);
+    res.render("login", { error: "Không tải được danh sách đơn vị", units: [] });
   }
 });
+
+
+
+app.post("/login", async (req, res) => {
+  const { unit, password } = req.body;
+  try {
+    const users = await getUsers();
+    const found = users.find(u => u.name === unit);
+
+    if (found.password && found.password.trim() !== "") {
+      // Có mật khẩu trong sheet -> bắt buộc kiểm tra
+      if (found.password === password) {
+        req.session.user = { unit: found.name };
+        return res.redirect("/");
+      } else {
+        const units = users.map(u => u.name).filter(Boolean);
+        return res.render("login", { error: "Sai mật khẩu", units });
+      }
+    } else {
+      // Không có mật khẩu (ô trống) -> cho login luôn
+      req.session.user = { unit: found.name };
+      return res.redirect("/");
+    }
+
+
+    const units = users.map(u => u.name).filter(Boolean);
+    return res.render("login", { error: "Không tìm thấy đơn vị", units });
+  } catch (err) {
+    console.error("POST /login error:", err);
+    res.render("login", { error: "Lỗi server khi đăng nhập", units: [] });
+  }
+});
+
+
 
 app.get("/logout", (req, res) => {
   req.session.destroy(() => res.redirect("/login"));
