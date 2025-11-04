@@ -54,8 +54,9 @@ export async function getUsers() {
   const records = await fetchSheet(url);
   return records
     .map(r => ({
-      username: r.username || r.user || r.email || "",
-      password: r.password || r.pass || ""
+      name: r.name || r.Name || "",
+      password: r.password || r.Pass || ""
     }))
-    .filter(u => u.username && u.password);
+    .filter(u => u.name);   // chỉ cần có name, không bắt buộc password
 }
+
