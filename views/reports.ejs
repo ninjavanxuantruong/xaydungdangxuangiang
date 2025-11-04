@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Danh sách báo cáo</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2 { margin-bottom: 15px; }
+    ul { list-style: none; padding: 0; }
+    li { margin: 8px 0; }
+    a {
+      text-decoration: none;
+      color: #007bff;
+      font-weight: bold;
+    }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h2>📑 Danh sách báo cáo</h2>
+  <ul>
+    <% if (reports && reports.length > 0) { %>
+      <% reports.forEach(r => { %>
+        <li>
+          <a href="/reports/<%= r.name %>"><%= r.name %></a>
+        </li>
+      <% }) %>
+    <% } else { %>
+      <li>Không có báo cáo nào.</li>
+    <% } %>
+  </ul>
+
+  <p><a href="/">⬅ Quay lại trang chính</a></p>
+</body>
+</html>
