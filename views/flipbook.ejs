@@ -7,50 +7,115 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
         <style>
-          /* Highlight overlay */
-          #highlightOverlay {
-            position:absolute;
-            top:0; left:0;
-            pointer-events:none;
+
+          #controlBar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 999;
+            background: #fff;
+            padding: 8px 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
           }
+          main {
+            padding-top: 64px; /* hoặc đúng chiều cao của #controlBar */
+          }
+
+
+
+          /* Reset & global */
+          html, body {
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;           /* tránh tràn ngang */
+            background: #fff;
+          }
+
+          body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
+          }
+
+          /* Main takes full width to allow proper centering of children */
+          main {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 8px 12px;            /* đệm nhẹ để không sát mép ở mobile */
+          }
+
+          /* Core centering rule: every main block is centered via auto margins */
+          .page-container,
+          #chunkTimeline,
+          #textView {
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            box-sizing: border-box;
+          }
+
+          /* Desktop max-width: applied only when screen is wide enough */
+          @media (min-width: 768px) {
+            .page-container,
+            #chunkTimeline,
+            #textView {
+              max-width: 960px;           /* chỉnh 860–1100 tuỳ mắt; 960 là tiêu chuẩn dễ đọc */
+            }
+          }
+
+          /* Canvas container and responsive canvas */
+          .page-container {
+            position: relative;           /* anchor cho overlay */
+          }
+
+          #pdfCanvas {
+            display: block;               /* loại bỏ inline khoảng trắng */
+            width: 100%;
+            height: auto;                 /* giữ tỉ lệ */
+          }
+
+          /* Overlays aligned to canvas area */
+          #highlightOverlay,
+          #markerOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;         /* highlight không bắt sự kiện */
+            width: 100%;
+            height: 100%;
+          }
+
           .highlight-box {
             position: absolute;
-            background: rgba(255, 224, 102, 0.2); /* giảm từ 0.35 xuống 0.2 */
+            background: rgba(255, 224, 102, 0.2);
             border-radius: 2px;
           }
 
-
-          /* Marker overlay */
-          #markerOverlay {
-            position:absolute;
-            top:0; left:0;
-            pointer-events:none;
-          }
           .chunk-marker {
-            position:absolute;
-            pointer-events:auto;
-            z-index:20;
-            color:red;
-            font-size:14px;
-            cursor:pointer;
-            user-select:none;
+            position: absolute;
+            pointer-events: auto;         /* marker có thể bấm */
+            z-index: 20;
+            color: red;
+            font-size: 14px;
+            cursor: pointer;
+            user-select: none;
           }
 
-          .page-container { 
-            position:relative; 
-            display:inline-block; 
-          }
+          /* Timeline centered and constrained */
           #chunkTimeline {
             display: flex;
-            overflow-x: auto;
-            margin: 0;            /* bỏ margin để sát mép */
-            padding: 6px;
-            width: 100vw;         /* full viewport width */
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 0;     /* bỏ bo góc nếu muốn giống hẳn */
             gap: 6px;
+            padding: 6px;
+            border: 1px solid #ccc;
             background: #fafafa;
+            border-radius: 0;
+            overflow-x: auto;             /* cuộn ngang khi nhiều block */
           }
 
           .chunk-block {
@@ -70,6 +135,56 @@
             border-color: #e6c441;
           }
 
+          /* Easy reading mode view: centered and readable */
+          #textView {
+            display: none;
+            width: 100%;
+            margin: 0 auto;
+            min-height: 60vh;
+            box-sizing: border-box;
+            padding: 16px;
+            line-height: 1.6;
+            font-size: var(--readerFont, 18px);
+            background: #fff;
+            color: #222;
+            overflow-y: auto;
+
+            /* ✅ Thêm 2 dòng này */
+            text-align: justify;
+            hyphens: auto;
+          }
+
+
+          /* Highlight active chunk inside textView */
+          .chunk-span.active {
+            background: rgba(255, 224, 102, 0.6);
+            border-radius: 2px;
+          }
+
+          /* Hide canvas/overlays when reader mode is active */
+          .reader-active #pdfCanvas,
+          .reader-active #highlightOverlay,
+          .reader-active #markerOverlay {
+            display: none !important;
+          }
+
+          /* Optional: prevent the timeline from stretching too tall on mobile */
+          #chunkTimeline {
+            max-height: 56px;
+            margin-top: 96px;
+          }
+
+          /* Optional: sticky timeline when scrolling long text in reader mode */
+          @media (min-width: 768px) {
+            #chunkTimeline {
+              position: sticky;
+              top: 0;
+              z-index: 50;
+            }
+          }
+
+
+
         </style>
       </head>
       <body>
@@ -79,16 +194,23 @@
         </div>
 
         <main>
-          <div class="controls">
+          <div id="controlBar">
             <button class="btn" id="prevBtn">⬅️ Trang trước</button>
             <button class="btn" id="nextBtn">➡️ Trang sau</button>
             <button class="btn primary" id="readBtn">🔊 Đọc trang</button>
             <button class="btn" id="pauseBtn">⏸ Dừng</button>
             <button class="btn" id="resumeBtn">▶️ Tiếp tục</button>
             <span id="pageInfo" class="page-info"></span>
+            <button class="btn" id="readerToggleBtn">📰 Chế độ dễ đọc</button>
+            <button class="btn" id="zoomOutTextBtn">A-</button>
+            <button class="btn" id="zoomInTextBtn">A+</button>
           </div>
 
           <div id="chunkTimeline"></div>
+        
+          <div id="textView"></div>
+
+   
 
 
           <!-- Canvas + overlays -->
@@ -97,6 +219,8 @@
             <div id="highlightOverlay"></div>
             <div id="markerOverlay"></div>
           </div>
+
+          
         </main>
 
         <script>
@@ -390,6 +514,32 @@
             if (blocks[index]) blocks[index].classList.add("active");
           }
 
+          // ====== Reader Mode ======
+          async function showTextView(pageNum, chunks, items) {
+            const textView = document.getElementById("textView");
+            textView.innerHTML = "";
+
+            chunks.forEach((chunk, i) => {
+              const span = document.createElement("span");
+              span.className = "chunk-span";
+              span.dataset.idx = i;
+              span.textContent = chunk.map(idx => items[idx].str).join(" ");
+              textView.appendChild(span);
+              textView.appendChild(document.createTextNode(" "));
+            });
+
+            textView.style.setProperty('--readerFont', readerFontPx + "px");
+            textView.style.display = "block";
+            document.body.classList.add("reader-active");
+          }
+
+          function setActiveChunkInTextView(i) {
+            document.querySelectorAll(".chunk-span").forEach(el => el.classList.remove("active"));
+            const el = document.querySelector(`.chunk-span[data-idx="${i}"]`);
+            if (el) el.classList.add("active");
+          }
+
+
 
 
 
@@ -461,8 +611,13 @@
               source.buffer = buffer;
               source.connect(audioCtx.destination);
 
-              drawChunkOverlayByItems(chunks[i], items, highlightOverlay);
-              setActiveChunkBlock(i);
+              if (readerMode) {
+                setActiveChunkInTextView(i);
+              } else {
+                drawChunkOverlayByItems(chunks[i], items, highlightOverlay);
+                setActiveChunkBlock(i);
+              }
+
 
               source.onended = () => {
                 if (!stopRequested) {
@@ -574,8 +729,13 @@
               source.buffer = buffer;
               source.connect(audioCtx.destination);
 
-              drawChunkOverlayByItems(chunks[i], items, highlightOverlay);
-              setActiveChunkBlock(i);
+              if (readerMode) {
+                setActiveChunkInTextView(i);
+              } else {
+                drawChunkOverlayByItems(chunks[i], items, highlightOverlay);
+                setActiveChunkBlock(i);
+              }
+
 
               source.onended = () => {
                 if (!stopRequested) {
@@ -706,13 +866,109 @@
               });
             });
 
-            // Khi thay đổi kích thước cửa sổ
-            window.addEventListener('resize', () => {
-              if (!pdfDoc) return;
-              resyncOverlayScale();
+// Khi thay đổi kích thước cửa sổ
+window.addEventListener('resize', () => {
+  if (!pdfDoc) return;
+  resyncOverlayScale();
+});
+
+// ====== Easy Reading Mode ======
+let readerMode = false;
+let readerFontPx = 18;
+
+          function groupItemsByLine(items, lineGap = 6) {
+            const lines = [];
+            let currentLine = [];
+            let prevY = null;
+
+            for (const it of items) {
+              if (prevY !== null && Math.abs(it.y - prevY) > lineGap) {
+                if (currentLine.length) lines.push(currentLine);
+                currentLine = [];
+              }
+              currentLine.push(it);
+              prevY = it.y;
+            }
+            if (currentLine.length) lines.push(currentLine);
+            return lines;
+          }
+
+          async function showTextView(pageNum) {
+            const page = await pdfDoc.getPage(pageNum);
+            const scale = 1.5;
+            const viewport = page.getViewport({ scale });
+            const textContent = await page.getTextContent();
+
+            let items = getItemsWithBoxes(textContent, viewport);
+            items = normalizeItems(items);
+            const chunks = buildItemChunks(items, 200);
+
+            const textView = document.getElementById("textView");
+            textView.innerHTML = "";
+
+            chunks.forEach((chunk, i) => {
+              const span = document.createElement("span");
+              span.className = "chunk-span";
+              span.dataset.idx = i;
+              span.textContent = chunk.tts; // dùng text TTS đã join
+              textView.appendChild(span);
+              textView.appendChild(document.createTextNode(" "));
             });
 
-            }); // end DOMContentLoaded
-            </script>
-            </body>
-            </html>
+            textView.style.setProperty('--readerFont', readerFontPx + "px");
+            textView.style.display = "block";
+            document.body.classList.add("reader-active");
+
+            // render timeline cho chế độ dễ đọc
+            renderChunkTimeline(chunks, items);
+
+            // lưu lại để playChunkFromIndex dùng
+            window.lastChunks = chunks;
+            window.lastItems = items;
+          }
+
+          function setActiveChunkInTextView(i) {
+            document.querySelectorAll(".chunk-span").forEach(el => el.classList.remove("active"));
+            const el = document.querySelector(`.chunk-span[data-idx="${i}"]`);
+            if (el) {
+              el.classList.add("active");
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }
+
+function hideTextView() {
+  const textView = document.getElementById("textView");
+  textView.style.display = "none";
+  textView.innerHTML = "";
+  document.body.classList.remove("reader-active");
+}
+
+document.getElementById("readerToggleBtn").addEventListener("click", async () => {
+  if (!pdfDoc) return;
+  stopAudio();
+  document.getElementById("chunkTimeline").innerHTML = "";
+  if (!readerMode) {
+    readerMode = true;
+    await showTextView(currentPage);
+  } else {
+    readerMode = false;
+    hideTextView();
+    await renderPage(currentPage);
+  }
+});
+
+document.getElementById("zoomInTextBtn").addEventListener("click", () => {
+  readerFontPx = Math.min(readerFontPx + 2, 36);
+  document.getElementById("textView").style.setProperty('--readerFont', readerFontPx + "px");
+});
+
+document.getElementById("zoomOutTextBtn").addEventListener("click", () => {
+  readerFontPx = Math.max(readerFontPx - 2, 12);
+  document.getElementById("textView").style.setProperty('--readerFont', readerFontPx + "px");
+});
+
+}); // end DOMContentLoaded
+</script>
+</body>
+</html>
+
