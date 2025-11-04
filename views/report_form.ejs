@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= reportName %></title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2 { margin-bottom: 15px; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-weight: bold; margin-bottom: 6px; }
+    textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      resize: vertical;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007bff;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover { background-color: #0056b3; }
+    .back { margin-top: 20px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <h2>📝 Báo cáo: <%= reportName %></h2>
+
+  <form method="POST" action="/reports/<%= reportName %>">
+    <% (fields || []).forEach(function(f){ %>
+      <div class="form-group">
+        <label for="<%= f %>"><%= f %></label>
+        <textarea id="<%= f %>" name="<%= f %>" placeholder="Nhập nội dung <%= f %>"></textarea>
+      </div>
+    <% }) %>
+    <button type="submit">Gửi báo cáo</button>
+  </form>
+
+  <a href="/reports" class="back">⬅ Quay lại danh sách báo cáo</a>
+</body>
+</html>
