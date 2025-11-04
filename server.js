@@ -12,52 +12,16 @@ dotenv.config();
 
 import admin from "firebase-admin";
 
-const serviceAccount = {
-  type: "service_account",
-  project_id: "xuangiangxdd",
-  private_key_id: "1c461f9679f05571af3ba777fc25694669dc0557",
-  private_key: `-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDsaDscPWQnU1J6
-pbQ+S+D2JUZdBhrU9U9XodCEuq9W62oRCdYve3r63/u5v6bjTmb5BEIzoG0C+Gqe
-XlnhEUZpWj8fMd90K6pFjD+6zKb19P4Gry27kleZDDDXpqtQdlrzmPDUoqIoPsx9
-HbnLzAE6aiHKzbmt50WtgtLUGypeRSP0lTkxGqSxN0AYD/N5Xr+h0j/AGlNbGQda
-gpg0Yxz4HYVwynH4EujAbbJmBNz3Ff33lnO8tWJya/th8EEQ8b3wKMwx2TEGLneh
-yjK8p+BpknlAQlaxJbMGGymwt9/oqLvpuhaw+SxqoXXzwvQTJJw9mMwv5nogZw5O
-GsY1bx1rAgMBAAECggEAI9qlCGHpNCunaTGDdiVE75/0nXwlCqJPz78bZF355Mlc
-c0wWH2pvWugogeHmuje0V1UFg1Xz4ozxgqZVpFRd5PGKfD0woipTLywXqEmMkuX+
-tt3PplCKF4ypRbOh7Nieb66E7ALkbA0mL12YRafhkc3x5ROxcwYN48RhHEkoclZo
-euLGWCfmluq8Dwyj1hAi17R4Xqg9gquElxIdCNv31GczZOQtfsjwg8D9hGV3aWBo
-faQ9VxpUZsrY1ynXFGERp/eycxmf2sJyN89VXen8VXNw3EfesIo9GveO2M/gRipp
-wLRtwWAfvulQBz5JNNjW3P2yIene9WlF+z3UsAn78QKBgQD7vlG0Z0y7RNDcIGyn
-5ZBiFyPkSr1rnd37Ez7sadmVapjS3p545320MKfkvX8Fvs2t17G12Q+t8OuDxOfF
-h4CuMHTqsqJ1o5NJHILr79+WzU0fc+Bokm6f/t8YWl/vhkeH7MD8Je6vloTX6/b/
-I4Z/v/tp6Djsdbq2+kXvX0ICewKBgQDwZ4cvqsZvsXf+xzzQ1TAfwfHs/QqwNkGs
-Yx0wa+W7AN1xx6OV+6u4mAb7/vW0BAQDD9d6XI257+xrWnZqP8Nm59WB2FO4qHYK
-2ub/Kqc8hzIQhHDKwnJd7wuz/RgGEdLTtbpP4Cd5AL7Ac6DUd6VUlA84scQeaDrn
-AYVIAtUV0QKBgD34gtp7F2t+LEAUB0tpepp7Ac3gDDMiwJNfEH1YLUTX4dj/DlnK
-+qnR1HK9pzg92RnzX/7Y+UAjb4aXgUqh6a53pUBlSxLUepxj1WLJQOw5i8OzXcnA
-SlU+g6LWFIm9L3ypbnRjzhcRYZBZuQrjrudh1j0i+mhTLux+PZsIgxJjAoGARvNn
-FIxkUGaiMZF/w2qH73d//R+ZXfRFYalG3hmaDZztvjzbbNKAFdTYitrujRh6TqUI
-RVa3hV7n+a8TL7xt4RsfCllcLC2b2QxODJT8EoMcJX/RAiZtNofsfkx+IJx2CoGh
-4R0YyT+NDKOTneFJ7DJeY68jYI4GhFMQkPY1CWECgYEAzfrE4XAuH4fuUzDNC+4u
-oDgHRwF1ETqTADFnyyZZLo76aqWbokoojm/q0fatspo8YamhQWDBvjkB7D0es2Ps
-C1y8TxIfz+TKJBIKP6SrwfWcPn+b7wMdNbFfmCx0S7nB1+IpvDezmOl9/R0QZ9eX
-UcVpfS5AEGsad/uYZuy7S9w=
------END PRIVATE KEY-----`,
-  client_email: "firebase-adminsdk-fbsvc@xuangiangxdd.iam.gserviceaccount.com",
-  client_id: "116176810800342076802",
-  auth_uri: "https://accounts.google.com/o/oauth2/auth",
-  token_uri: "https://oauth2.googleapis.com/token",
-  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-  client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40xuangiangxdd.iam.gserviceaccount.com",
-  universe_domain: "googleapis.com"
-};
-
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  }),
 });
 
 const firestore = admin.firestore();
+
 
 
 
