@@ -1,171 +1,64 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8" />
-  <title><%= name %></title>
-  <link rel="stylesheet" href="/public/style.css" />
-  <!-- PDF.js từ CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
-</head>
-<body>
-  
+      <!DOCTYPE html>
+      <html lang="vi">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Đăng nhập</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link rel="stylesheet" href="/public/style.css" />
+        <style>
+          body { margin: 0; font-family: "Roboto", Arial, sans-serif; background: #fff; }
+          header.site-header { display: flex; align-items: center; background: #cc0000; color: #fff; padding: 10px 20px; }
+          header .logo img { height: 60px; margin-right: 15px; }
+          header .title h1 { margin: 0; font-size: 22px; font-weight: bold; }
+          header .title h2 { margin: 0; font-size: 16px; font-weight: normal; }
+          main { padding: 20px; max-width: 400px; margin: 40px auto; background: #f9f9f9; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+          h2.section-title { color: #cc0000; margin-bottom: 20px; text-align: center; }
+          .form-group { margin-bottom: 15px; }
+          label { display: block; margin-bottom: 6px; font-weight: bold; }
+          select, input[type="password"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+          .btn.primary { display: block; width: 100%; background: #d50000; color: #fff; border: none; padding: 10px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.3s; }
+          .btn.primary:hover { background: #a00000; }
+          .error { color: #d50000; margin-bottom: 15px; text-align: center; font-weight: bold; }
+        </style>
+      </head>
+      <body>
 
-  <main>
-    <div class="controls">
-      <button class="btn" id="prevBtn">⬅️ Trang trước</button>
-      <button class="btn" id="nextBtn">➡️ Trang sau</button>
-      <button class="btn primary" id="readBtn">🔊 Đọc trang</button>
-      <button class="btn" id="stopBtn">⏸️ Tạm dừng</button>
-      <span id="pageInfo" class="page-info"></span>
-    </div>
+        <header class="site-header">
+          <div class="logo">
+            <img src="https://raw.githubusercontent.com/ninjavanxuantruong/xaydungdangxuangiang/main/logo-%20dang-cong-san-vietnam-vector-1.png" alt="Logo Đảng" />
+          </div>
+          <div class="title">
+            <h1>PHẦM MỀM TƯ LIỆU ĐẢNG</h1>
+            <h2>ĐẢNG ỦY XÃ XUÂN GIANG</h2>
+          </div>
+        </header>
 
-    <canvas id="pdfCanvas"></canvas>
-  </main>
+        <main>
+          <h2 class="section-title">🔑 Đăng nhập</h2>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const pdfUrl = "<%= link %>";
-      const canvas = document.getElementById('pdfCanvas');
-      const ctx = canvas.getContext('2d');
-      const prevBtn = document.getElementById('prevBtn');
-      const nextBtn = document.getElementById('nextBtn');
-      const readBtn = document.getElementById('readBtn');
-      const stopBtn = document.getElementById('stopBtn');
-      const pageInfo = document.getElementById('pageInfo');
+          <% if (error) { %>
+            <div class="error"><%= error %></div>
+          <% } %>
 
-      let pdfDoc = null;
-      let currentPage = 1;
-      let scale = 1.2;
+          <form method="POST" action="/login" class="login-form">
+            <div class="form-group">
+              <label for="unit">Đơn vị</label>
+              <select id="unit" name="unit" required>
+                <% (units || []).forEach(function(u) { %>
+                  <option value="<%= u %>"><%= u %></option>
+                <% }) %>
+              </select>
+            </div>
 
-      // ====== Voice setup ======
-      let voices = [];
-      let viVoice = null;
-      function loadVoices() {
-        voices = speechSynthesis.getVoices() || [];
-        viVoice = voices.find(v => v.lang.toLowerCase() === 'vi-vn')
-               || voices.find(v => v.lang.toLowerCase().startsWith('vi'))
-               || null;
-      }
-      loadVoices();
-      speechSynthesis.onvoiceschanged = loadVoices;
+            <div class="form-group">
+              <label for="password">Mật khẩu</label>
+              <input type="password" id="password" name="password" />
 
-      // ====== Reading state ======
-      let isReading = false;
-      let isPaused = false;
-      let currentUtterance = null;
+            </div>
 
-      // ====== PDF load ======
-      const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
-      loadingTask.promise.then(doc => {
-        pdfDoc = doc;
-        renderPage(currentPage);
-        updatePageInfo();
-      }).catch(err => {
-        console.error('PDF load error:', err);
-        alert('Không thể tải PDF. Vui lòng kiểm tra link.');
-      });
+            <button type="submit" class="btn primary">Đăng nhập</button>
+          </form>
+        </main>
 
-      function updatePageInfo() {
-        if (!pdfDoc) return;
-        pageInfo.textContent = `Trang ${currentPage} / ${pdfDoc.numPages}`;
-      }
-
-      async function renderPage(num) {
-        const page = await pdfDoc.getPage(num);
-        const viewport = page.getViewport({ scale });
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        await page.render({ canvasContext: ctx, viewport }).promise;
-        // Auto stop reading when changing page
-        if (speechSynthesis.speaking) {
-          speechSynthesis.cancel();
-          isReading = false;
-          isPaused = false;
-          stopBtn.textContent = "⏸️ Tạm dừng";
-        }
-      }
-
-      async function readCurrentPage() {
-        if (!pdfDoc) return;
-
-        // Nếu đang đọc thì bấm lại sẽ dừng hẳn
-        if (isReading) {
-          speechSynthesis.cancel();
-          isReading = false;
-          isPaused = false;
-          stopBtn.textContent = "⏸️ Tạm dừng";
-          return;
-        }
-
-        const page = await pdfDoc.getPage(currentPage);
-        const textContent = await page.getTextContent();
-        const text = textContent.items.map(item => item.str).join(' ');
-        if (!text || text.trim().length === 0) {
-          alert('Trang này không có văn bản (có thể là ảnh scan).');
-          return;
-        }
-
-        if (speechSynthesis.speaking) {
-          speechSynthesis.cancel();
-        }
-
-        currentUtterance = new SpeechSynthesisUtterance(text);
-        currentUtterance.lang = 'vi-VN';
-        if (viVoice) currentUtterance.voice = viVoice;
-        currentUtterance.rate = 1;
-        currentUtterance.pitch = 1;
-
-        currentUtterance.onend = () => {
-          isReading = false;
-          isPaused = false;
-          stopBtn.textContent = "⏸️ Tạm dừng";
-        };
-        currentUtterance.onerror = () => {
-          isReading = false;
-          isPaused = false;
-          stopBtn.textContent = "⏸️ Tạm dừng";
-        };
-
-        isReading = true;
-        isPaused = false;
-        speechSynthesis.speak(currentUtterance);
-      }
-
-      // ====== Event listeners ======
-      prevBtn.addEventListener('click', async () => {
-        if (!pdfDoc || currentPage <= 1) return;
-        currentPage--;
-        await renderPage(currentPage);
-        updatePageInfo();
-      });
-
-      nextBtn.addEventListener('click', async () => {
-        if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
-        currentPage++;
-        await renderPage(currentPage);
-        updatePageInfo();
-      });
-
-      readBtn.addEventListener('click', readCurrentPage);
-
-      // Nút Stop = Pause/Resume
-      stopBtn.addEventListener('click', () => {
-        if (!speechSynthesis.speaking && !isPaused) return;
-
-        if (!isPaused) {
-          // Đang đọc -> tạm dừng
-          speechSynthesis.pause();
-          isPaused = true;
-          stopBtn.textContent = "▶️ Tiếp tục";
-        } else {
-          // Đang tạm dừng -> tiếp tục
-          speechSynthesis.resume();
-          isPaused = false;
-          stopBtn.textContent = "⏸️ Tạm dừng";
-        }
-      });
-    });
-  </script>
-
-</body>
-</html>
+      </body>
+      </html>
