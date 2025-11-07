@@ -346,12 +346,26 @@ app.post("/reports/:name", requireLogin, async (req, res) => {
       }
     }, { merge: true });
 
-    res.redirect("/reports");
+    // ✅ Sau khi lưu thành công: render lại form với status=success
+    const reports = await getReports();
+    const report = reports.find(r => normalizeReportName(r.name) === reportName);
+    const fields = report ? await fetchSheetColumnsFromGoogleLink(report.url) : [];
+
+    res.render("report_form", { reportName, fields, status: "success" });
+
   } catch (err) {
     console.error("POST /reports/:name error:", err);
-    res.status(500).send("Không lưu được báo cáo");
+
+    // ❌ Nếu lỗi: render lại form với status=error
+    const reportName = normalizeReportName(req.params.name);
+    const reports = await getReports();
+    const report = reports.find(r => normalizeReportName(r.name) === reportName);
+    const fields = report ? await fetchSheetColumnsFromGoogleLink(report.url) : [];
+
+    res.render("report_form", { reportName, fields, status: "error" });
   }
 });
+
 
 // ====== Helper: chuẩn hóa tên báo cáo ======
 function normalizeReportName(name) {
