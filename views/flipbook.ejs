@@ -4,7 +4,8 @@
         <meta charset="UTF-8" />
         <title><%= name %></title>
         <link rel="stylesheet" href="/public/style.css" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
         <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
         <style>
 
@@ -153,6 +154,23 @@
             text-align: justify;
             hyphens: auto;
           }
+          #loadingAlert {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%); /* căn giữa ngang dọc */
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px 30px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 1000;
+            text-align: center;
+          }
+
 
 
           /* Highlight active chunk inside textView */
@@ -195,15 +213,19 @@
 
         <main>
           <div id="controlBar">
-            <button class="btn" id="prevBtn">⬅️ Trang trước</button>
-            <button class="btn" id="nextBtn">➡️ Trang sau</button>
+            <button class="btn" id="prevBtn">⬅️ Trước</button>
+            <button class="btn" id="nextBtn">➡️ Sau</button>
             <button class="btn primary" id="readBtn">🔊 Đọc trang</button>
             <button class="btn" id="pauseBtn">⏸ Dừng</button>
             <button class="btn" id="resumeBtn">▶️ Tiếp tục</button>
             <span id="pageInfo" class="page-info"></span>
             <button class="btn" id="readerToggleBtn">📰 Chế độ dễ đọc</button>
-            <button class="btn" id="zoomOutTextBtn">A-</button>
-            <button class="btn" id="zoomInTextBtn">A+</button>
+            <button class="btn" id="zoomOutTextBtn"> Chữ to</button>
+            <button class="btn" id="zoomInTextBtn">Chữ nhỏ</button>
+            <button class="btn" id="speedDownBtn">Chậm</button>
+            <button class="btn" id="speedUpBtn">Nhanh</button>
+            <span id="speedInfo">Tốc độ: 1.0x</span>
+
           </div>
 
           <div id="chunkTimeline"></div>
@@ -266,6 +288,7 @@
 
           let pdfDoc = null;
           let currentPage = 1;
+          let playbackRate = 1.0;
 
           // Quản lý timeout highlight
           let activeTimeouts = [];
@@ -574,6 +597,7 @@
             let stopRequested = false;
             let currentSource = null;
             let bufferQueue = [];
+            
 
             async function fetchBuffer(snippet) {
               try {
@@ -609,6 +633,7 @@
 
               const source = audioCtx.createBufferSource();
               source.buffer = buffer;
+              source.playbackRate.value = playbackRate;
               source.connect(audioCtx.destination);
 
               if (readerMode) {
@@ -651,6 +676,29 @@
               highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
             }
           }
+
+          async function renderTextView(pageNum) {
+            const page = await pdfDoc.getPage(pageNum);
+            const scale = 1.5;
+            const viewport = page.getViewport({ scale });
+            const textContent = await page.getTextContent();
+
+            let items = getItemsWithBoxes(textContent, viewport);
+            items = normalizeItems(items);
+            const chunks = buildItemChunks(items, 200);
+
+            const textView = document.getElementById("textView");
+            textView.innerHTML = "";
+            chunks.forEach((chunk, i) => {
+              const span = document.createElement("span");
+              span.className = "chunk-span";
+              span.dataset.idx = i;
+              span.textContent = chunk.tts;
+              textView.appendChild(span);
+              textView.appendChild(document.createTextNode(" "));
+            });
+          }
+
 
 
 
@@ -727,6 +775,7 @@
 
               const source = audioCtx.createBufferSource();
               source.buffer = buffer;
+              source.playbackRate.value = playbackRate;
               source.connect(audioCtx.destination);
 
               if (readerMode) {
@@ -771,63 +820,98 @@
 
 
             // ====== Nút điều khiển ======
-            prevBtn.addEventListener('click', async () => {
-              if (!pdfDoc || currentPage <= 1) return;
-              currentPage--;
-              stopAudio();
-              document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
-              await renderPage(currentPage);
-              updatePageInfo();
-              flipSound.currentTime = 0; flipSound.play();
-            });
+          speedDownBtn.addEventListener('click', () => {
+            playbackRate = Math.max(0.5, playbackRate - 0.25); // không nhỏ hơn 0.5x
+            document.getElementById("speedInfo").textContent = `Tốc độ: ${playbackRate.toFixed(2)}x`;
+          });
 
-            nextBtn.addEventListener('click', async () => {
-              if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
-              currentPage++;
-              stopAudio();
-              document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
-              await renderPage(currentPage);
-              updatePageInfo();
-              flipSound.currentTime = 0; flipSound.play();
-            });
+          speedUpBtn.addEventListener('click', () => {
+            playbackRate = Math.min(2.0, playbackRate + 0.25); // không lớn hơn 2x
+            document.getElementById("speedInfo").textContent = `Tốc độ: ${playbackRate.toFixed(2)}x`;
+          });
 
-            readBtn.addEventListener('click', () => {
-              unlockAudio();
-              readCurrentPage();
-            });
+          
+          prevBtn.addEventListener('click', async () => {
+            if (!pdfDoc || currentPage <= 1) return;
+            currentPage--;
+            stopAudio();
+            document.getElementById("chunkTimeline").innerHTML = "";
+            await renderPage(currentPage);
+            updatePageInfo();
+            flipSound.currentTime = 0; flipSound.play();
 
-            pauseBtn.addEventListener('click', () => {
-              if (audioCtx && audioCtx.state === "running") audioCtx.suspend();
-            });
-            resumeBtn.addEventListener('click', () => {
-              if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
-            });
+            // 👉 nếu đang ở chế độ dễ đọc thì dựng lại text cho trang mới
+            if (readerMode) {
+              await renderTextView(currentPage);
+            }
+          });
+
+          nextBtn.addEventListener('click', async () => {
+            if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
+            currentPage++;
+            stopAudio();
+            document.getElementById("chunkTimeline").innerHTML = "";
+            await renderPage(currentPage);
+            updatePageInfo();
+            flipSound.currentTime = 0; flipSound.play();
+
+            // 👉 nếu đang ở chế độ dễ đọc thì dựng lại text cho trang mới
+            if (readerMode) {
+              await renderTextView(currentPage);
+            }
+          });
+
+          readBtn.addEventListener('click', () => {
+            unlockAudio();
+            readCurrentPage();   // nút đọc vẫn gọi readCurrentPage để đọc toàn bộ trang
+          });
+
+          pauseBtn.addEventListener('click', () => {
+            if (audioCtx && audioCtx.state === "running") audioCtx.suspend();
+          });
+
+          resumeBtn.addEventListener('click', () => {
+            if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+          });
+
 
             // Swipe (mobile)
             let touchStartX = 0;
             canvas.addEventListener('touchstart', (e) => {
               touchStartX = e.changedTouches[0].screenX;
             });
-            canvas.addEventListener('touchend', async (e) => {
-              const touchEndX = e.changedTouches[0].screenX;
-              const deltaX = touchEndX - touchStartX;
-              if (Math.abs(deltaX) < 50) return;
-              if (deltaX < 0 && currentPage < pdfDoc.numPages) {
-                currentPage++;
-                stopAudio();
-                document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
-                await renderPage(currentPage);
-                updatePageInfo();
-                flipSound.currentTime = 0; flipSound.play();
-              } else if (deltaX > 0 && currentPage > 1) {
-                currentPage--;
-                stopAudio();
-                document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
-                await renderPage(currentPage);
-                updatePageInfo();
-                flipSound.currentTime = 0; flipSound.play();
+          canvas.addEventListener('touchend', async (e) => {
+            const touchEndX = e.changedTouches[0].screenX;
+            const deltaX = touchEndX - touchStartX;
+            if (Math.abs(deltaX) < 50) return;
+
+            if (deltaX < 0 && currentPage < pdfDoc.numPages) {
+              currentPage++;
+              stopAudio();
+              document.getElementById("chunkTimeline").innerHTML = "";
+              await renderPage(currentPage);
+              updatePageInfo();
+              flipSound.currentTime = 0; flipSound.play();
+
+              // 👉 thêm đoạn này
+              if (readerMode) {
+                readCurrentPage();
               }
-            });
+            } else if (deltaX > 0 && currentPage > 1) {
+              currentPage--;
+              stopAudio();
+              document.getElementById("chunkTimeline").innerHTML = "";
+              await renderPage(currentPage);
+              updatePageInfo();
+              flipSound.currentTime = 0; flipSound.play();
+
+              // 👉 thêm đoạn này
+              if (readerMode) {
+                readCurrentPage();
+              }
+            }
+          });
+
 
             // Mouse drag (desktop)
             let startX = 0;
