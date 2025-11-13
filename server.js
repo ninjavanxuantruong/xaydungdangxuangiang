@@ -12,16 +12,52 @@ dotenv.config();
 
 import admin from "firebase-admin";
 
+const serviceAccount = {
+  type: "service_account",
+  project_id: "xuangiangxdd",
+  private_key_id: "1c461f9679f05571af3ba777fc25694669dc0557",
+  private_key: `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDsaDscPWQnU1J6
+pbQ+S+D2JUZdBhrU9U9XodCEuq9W62oRCdYve3r63/u5v6bjTmb5BEIzoG0C+Gqe
+XlnhEUZpWj8fMd90K6pFjD+6zKb19P4Gry27kleZDDDXpqtQdlrzmPDUoqIoPsx9
+HbnLzAE6aiHKzbmt50WtgtLUGypeRSP0lTkxGqSxN0AYD/N5Xr+h0j/AGlNbGQda
+gpg0Yxz4HYVwynH4EujAbbJmBNz3Ff33lnO8tWJya/th8EEQ8b3wKMwx2TEGLneh
+yjK8p+BpknlAQlaxJbMGGymwt9/oqLvpuhaw+SxqoXXzwvQTJJw9mMwv5nogZw5O
+GsY1bx1rAgMBAAECggEAI9qlCGHpNCunaTGDdiVE75/0nXwlCqJPz78bZF355Mlc
+c0wWH2pvWugogeHmuje0V1UFg1Xz4ozxgqZVpFRd5PGKfD0woipTLywXqEmMkuX+
+tt3PplCKF4ypRbOh7Nieb66E7ALkbA0mL12YRafhkc3x5ROxcwYN48RhHEkoclZo
+euLGWCfmluq8Dwyj1hAi17R4Xqg9gquElxIdCNv31GczZOQtfsjwg8D9hGV3aWBo
+faQ9VxpUZsrY1ynXFGERp/eycxmf2sJyN89VXen8VXNw3EfesIo9GveO2M/gRipp
+wLRtwWAfvulQBz5JNNjW3P2yIene9WlF+z3UsAn78QKBgQD7vlG0Z0y7RNDcIGyn
+5ZBiFyPkSr1rnd37Ez7sadmVapjS3p545320MKfkvX8Fvs2t17G12Q+t8OuDxOfF
+h4CuMHTqsqJ1o5NJHILr79+WzU0fc+Bokm6f/t8YWl/vhkeH7MD8Je6vloTX6/b/
+I4Z/v/tp6Djsdbq2+kXvX0ICewKBgQDwZ4cvqsZvsXf+xzzQ1TAfwfHs/QqwNkGs
+Yx0wa+W7AN1xx6OV+6u4mAb7/vW0BAQDD9d6XI257+xrWnZqP8Nm59WB2FO4qHYK
+2ub/Kqc8hzIQhHDKwnJd7wuz/RgGEdLTtbpP4Cd5AL7Ac6DUd6VUlA84scQeaDrn
+AYVIAtUV0QKBgD34gtp7F2t+LEAUB0tpepp7Ac3gDDMiwJNfEH1YLUTX4dj/DlnK
++qnR1HK9pzg92RnzX/7Y+UAjb4aXgUqh6a53pUBlSxLUepxj1WLJQOw5i8OzXcnA
+SlU+g6LWFIm9L3ypbnRjzhcRYZBZuQrjrudh1j0i+mhTLux+PZsIgxJjAoGARvNn
+FIxkUGaiMZF/w2qH73d//R+ZXfRFYalG3hmaDZztvjzbbNKAFdTYitrujRh6TqUI
+RVa3hV7n+a8TL7xt4RsfCllcLC2b2QxODJT8EoMcJX/RAiZtNofsfkx+IJx2CoGh
+4R0YyT+NDKOTneFJ7DJeY68jYI4GhFMQkPY1CWECgYEAzfrE4XAuH4fuUzDNC+4u
+oDgHRwF1ETqTADFnyyZZLo76aqWbokoojm/q0fatspo8YamhQWDBvjkB7D0es2Ps
+C1y8TxIfz+TKJBIKP6SrwfWcPn+b7wMdNbFfmCx0S7nB1+IpvDezmOl9/R0QZ9eX
+UcVpfS5AEGsad/uYZuy7S9w=
+-----END PRIVATE KEY-----`,
+  client_email: "firebase-adminsdk-fbsvc@xuangiangxdd.iam.gserviceaccount.com",
+  client_id: "116176810800342076802",
+  auth_uri: "https://accounts.google.com/o/oauth2/auth",
+  token_uri: "https://oauth2.googleapis.com/token",
+  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+  client_x509_cert_url: "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40xuangiangxdd.iam.gserviceaccount.com",
+  universe_domain: "googleapis.com"
+};
+
 admin.initializeApp({
-  credential: admin.credential.cert({
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-  }),
+  credential: admin.credential.cert(serviceAccount),
 });
 
 const firestore = admin.firestore();
-
 
 
 
@@ -324,6 +360,8 @@ app.get("/reports/:name", requireLogin, async (req, res) => {
 });
 
 // ====== Submit report (1 báo cáo = 1 document, trong data có cả tên người) ======
+// ====== Submit report (1 báo cáo = 1 document, trong data có cả tên người) ======
+// ====== Submit report (1 báo cáo = 1 document, trong data có cả tên người) ======
 app.post("/reports/:name", requireLogin, async (req, res) => {
   try {
     const unit = req.session?.user?.unit || "Unknown unit";
@@ -331,18 +369,23 @@ app.post("/reports/:name", requireLogin, async (req, res) => {
     const reportName = normalizeReportName(req.params.name);
 
     // Data từ form động + thêm tên người
-    const data = { ...req.body, user: username };
+    const data = {
+      ...req.body,
+      user: username,
+      submittedAt: new Date().toISOString()
+    };
 
     // Document ID = reportName
     const docRef = firestore.collection("report_submissions").doc(reportName);
 
+    // Giữ cấu trúc submissions như cũ, nhưng biến mỗi đơn vị thành MẢNG các lần nộp
     await docRef.set({
       reportName,
       submissions: {
-        [unit]: {
+        [unit]: admin.firestore.FieldValue.arrayUnion({
           data,
-          submittedAt: new Date().toISOString()
-        }
+          submittedAt: data.submittedAt
+        })
       }
     }, { merge: true });
 
@@ -367,12 +410,43 @@ app.post("/reports/:name", requireLogin, async (req, res) => {
 });
 
 
+
+
 // ====== Helper: chuẩn hóa tên báo cáo ======
 function normalizeReportName(name) {
   return (name || "")
     .trim()
     .replace(/\s+/g, " ");
 }
+// báo cáo
+// ====== API: lấy dữ liệu mới nhất của đơn vị cho báo cáo ======
+app.get("/api/reports/:name/latest", requireLogin, async (req, res) => {
+  try {
+    const reportName = req.params.name;
+    const unit = req.session?.user?.unit;
+
+    if (!unit) return res.json({ data: null });
+
+    const doc = await firestore.collection("report_submissions").doc(reportName).get();
+    if (!doc.exists) return res.json({ data: null });
+
+    const { submissions = {} } = doc.data() || {};
+    const sub = submissions[unit];
+
+    let latest = null;
+    if (Array.isArray(sub) && sub.length > 0) {
+      const sorted = [...sub].sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt));
+      latest = sorted[sorted.length - 1];
+    } else if (sub && sub.data) {
+      latest = sub;
+    }
+
+    res.json({ data: latest ? latest.data : null });
+  } catch (err) {
+    console.error("GET /api/reports/:name/latest error:", err);
+    res.json({ data: null });
+  }
+});
 
 // ====== Danh sách kết quả báo cáo ======
 app.get("/reports/results", requireLogin, async (req, res) => {
@@ -392,6 +466,8 @@ app.get("/reports/results", requireLogin, async (req, res) => {
   }
 });
 
+// ====== Kết quả tổng hợp theo tên báo cáo ======
+// ====== Kết quả tổng hợp theo tên báo cáo ======
 // ====== Kết quả tổng hợp theo tên báo cáo ======
 // ====== Kết quả tổng hợp theo tên báo cáo ======
 app.get("/reports/results/:reportName", requireLogin, async (req, res) => {
@@ -419,18 +495,54 @@ app.get("/reports/results/:reportName", requireLogin, async (req, res) => {
     // Lấy document của báo cáo này trong Firestore
     const doc = await firestore.collection("report_submissions").doc(reportName).get();
     if (!doc.exists) {
-      return res.render("report_result_form", { reportName, fields, units, submissions: {} });
+      return res.render("report_result_form", {
+        reportName, fields, units,
+        submissions: {}, latest: [], history: []
+      });
     }
 
     const { submissions = {} } = doc.data();
 
-    // Render ra EJS với đủ dữ liệu
-    res.render("report_result_form", { reportName, fields, units, submissions });
+    // Chuẩn hóa: mỗi đơn vị có thể là 1 object (cũ) hoặc mảng (mới). Ta chuyển hết thành mảng.
+    const grouped = {};
+    units.forEach(u => {
+      const sub = submissions[u];
+      if (!sub) {
+        grouped[u] = [];
+      } else if (Array.isArray(sub)) {
+        grouped[u] = sub.filter(x => !!x && !!x.submittedAt);
+      } else {
+        grouped[u] = sub.submittedAt ? [sub] : [];
+      }
+    });
+
+    // Sắp xếp mỗi mảng theo thời gian tăng dần
+    Object.values(grouped).forEach(arr =>
+      arr.sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt))
+    );
+
+    // Tách latest và history
+    const latest = {};
+    const history = {};
+    for (const u of units) {
+      const arr = grouped[u];
+      if (arr.length > 0) {
+        latest[u] = arr[arr.length - 1]; // bản mới nhất
+        if (arr.length > 1) {
+          history[u] = arr.slice(0, -1); // các bản cũ
+        }
+      }
+    }
+
+    // Render ra EJS với dữ liệu đã tách
+    res.render("report_result_form", { reportName, fields, units, submissions, latest, history });
   } catch (err) {
     console.error("GET /reports/results/:reportName error:", err);
     res.status(500).send("Không tải được kết quả báo cáo");
   }
 });
+
+
 
 
 
