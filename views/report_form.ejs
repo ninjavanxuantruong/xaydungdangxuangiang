@@ -6,91 +6,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/public/style.css" />
   <style>
-    body {
-      margin: 0;
-      font-family: "Roboto", Arial, sans-serif;
-      background: #fff;
-    }
-    header.site-header {
-      display: flex;
-      align-items: center;
-      background: #cc0000;
-      color: #fff;
-      padding: 10px 20px;
-    }
-    header .logo img {
-      height: 50px;
-      margin-right: 15px;
-    }
-    header .title h1 {
-      margin: 0;
-      font-size: 20px;
-      font-weight: bold;
-    }
-    header .title h2 {
-      margin: 0;
-      font-size: 14px;
-      font-weight: normal;
-    }
-    .logout-btn {
-      margin-left: auto;
-      color: #fff;
-      text-decoration: none;
-      font-weight: bold;
-      background: #a00000;
-      padding: 6px 12px;
-      border-radius: 4px;
-    }
-    main {
-      padding: 20px;
-      max-width: 800px;
-      margin: auto;
-    }
-    h2.section-title {
-      color: #cc0000;
-      margin-bottom: 20px;
-      font-size: 18px;
-      text-align: center;
-    }
-    .form-group {
-      margin-bottom: 15px;
-    }
-    label {
-      display: block;
-      font-weight: bold;
-      margin-bottom: 6px;
-      color: #333;
-    }
-    textarea {
-      width: 100%;
-      min-height: 100px;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      resize: vertical;
-      font-size: 14px;
-    }
-    /* 🔥 Nút gửi to hơn */
-    button {
-      width: 100%;
-      padding: 16px;
-      background-color: #d50000;
-      border: none;
-      border-radius: 8px;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 18px;
-    }
+    body { margin: 0; font-family: "Roboto", Arial, sans-serif; background: #fff; }
+    header.site-header { display: flex; align-items: center; background: #cc0000; color: #fff; padding: 10px 20px; }
+    header .logo img { height: 50px; margin-right: 15px; }
+    header .title h1 { margin: 0; font-size: 20px; font-weight: bold; }
+    header .title h2 { margin: 0; font-size: 14px; font-weight: normal; }
+    .logout-btn { margin-left: auto; color: #fff; text-decoration: none; font-weight: bold; background: #a00000; padding: 6px 12px; border-radius: 4px; }
+    main { padding: 20px; max-width: 800px; margin: auto; }
+    h2.section-title { color: #cc0000; margin-bottom: 20px; font-size: 18px; text-align: center; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-weight: bold; margin-bottom: 6px; color: #333; }
+    textarea { width: 100%; min-height: 100px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; resize: vertical; font-size: 14px; }
+    button { width: 100%; padding: 16px; background-color: #d50000; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; font-size: 18px; }
     button:hover { background-color: #a00000; }
-    .back {
-      margin-top: 20px;
-      display: block;
-      text-align: center;
-      color: #d50000;
-      font-weight: bold;
-      text-decoration: none;
-    }
+    .back { margin-top: 20px; display: block; text-align: center; color: #d50000; font-weight: bold; text-decoration: none; }
     @media (max-width: 600px) {
       header .title h1 { font-size: 16px; }
       header .title h2 { font-size: 12px; }
@@ -127,11 +56,14 @@
       <button type="submit">Gửi báo cáo</button>
     </form>
 
-    <a href="/" class="back">⬅ Quay lại Dashboard</a>
+    <a href="/" class="back">⬅ Quay lại Giao diện chính</a>
   </main>
 
-  <!-- Script hiển thị alert -->
+  <!-- Script hiển thị alert + tự điền dữ liệu -->
   <script>
+    // Xuất biến fields từ server sang client để dùng trong script
+    const fields = <%- JSON.stringify(fields || []) %>;
+
     document.addEventListener("DOMContentLoaded", function() {
       <% if (typeof status !== "undefined") { %>
         if ("<%= status %>" === "success") {
@@ -142,6 +74,21 @@
           alert("❌ Gửi báo cáo chưa thành công, vui lòng thử lại.");
         }
       <% } %>
+
+      // Tự động điền dữ liệu đã nộp (nếu có)
+      fetch("/api/reports/<%= reportName %>/latest", { credentials: "same-origin" })
+        .then(resp => resp.json())
+        .then(json => {
+          const data = json && json.data;
+          if (!data) return;
+          fields.forEach(function(f){
+            const el = document.getElementById(f);
+            if (el && typeof data[f] === "string") {
+              el.value = data[f];
+            }
+          });
+        })
+        .catch(err => console.warn("Không tải được dữ liệu đã nộp:", err));
     });
   </script>
 </body>
