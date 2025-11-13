@@ -1,85 +1,113 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8" />
-  <title>Kết quả báo cáo - <%= reportName %></title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h2 { margin-bottom: 15px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background: #f2f2f2; }
-    tr:nth-child(even) { background: #fafafa; }
-    .stats { margin-top: 30px; }
-    .stats h3 { margin-bottom: 8px; }
-    .copy-btn {
-      margin-left: 10px;
-      padding: 4px 8px;
-      font-size: 12px;
-      cursor: pointer;
-      border: 1px solid #007bff;
-      background: #007bff;
-      color: #fff;
-      border-radius: 4px;
-    }
-    .copy-btn:hover { background: #0056b3; }
-    pre { background: #f9f9f9; padding: 10px; border: 1px solid #ddd; }
-  </style>
-</head>
-<body>
-  <h2>📊 Kết quả báo cáo: <%= reportName %></h2>
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Kết quả báo cáo - <%= reportName %></title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h2 { margin-bottom: 15px; }
+            table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+            th { background: #f2f2f2; }
+            tr:nth-child(even) { background: #fafafa; }
+            .stats { margin-top: 30px; }
+            .stats h3 { margin-bottom: 8px; }
+            .copy-btn {
+              margin-left: 10px;
+              padding: 4px 8px;
+              font-size: 12px;
+              cursor: pointer;
+              border: 1px solid #007bff;
+              background: #007bff;
+              color: #fff;
+              border-radius: 4px;
+            }
+            .copy-btn:hover { background: #0056b3; }
+            pre { background: #f9f9f9; padding: 10px; border: 1px solid #ddd; }
+          </style>
+        </head>
+        <body>
+          <h2>📊 Kết quả báo cáo: <%= reportName %></h2>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Đơn vị</th>
-        <% fields.forEach(field => { %>
-          <th><%= field %></th>
-        <% }) %>
-        <th>Thời gian nộp</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% units.forEach(unit => { 
-           const sub = submissions[unit]; %>
-        <tr>
-          <td><%= unit %></td>
-          <% fields.forEach(field => { %>
-            <td><%= sub && sub.data[field] ? sub.data[field] : "" %></td>
-          <% }) %>
-          <td><%= sub && sub.submittedAt ? new Date(sub.submittedAt).toLocaleString("vi-VN") : "" %></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+          <!-- Bảng chính: hiển thị bản mới nhất của từng đơn vị -->
+          <table>
+            <thead>
+              <tr>
+                <th>Đơn vị</th>
+                <% fields.forEach(field => { %>
+                  <th><%= field %></th>
+                <% }) %>
+                <th>Thời gian nộp</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% units.forEach(unit => { 
+                   const sub = latest && latest[unit]; %>
+                <tr>
+                  <td><%= unit %></td>
+                  <% fields.forEach(field => { %>
+                    <td><%= sub && sub.data && sub.data[field] ? sub.data[field] : "" %></td>
+                  <% }) %>
+                  <td><%= sub && sub.submittedAt ? new Date(sub.submittedAt).toLocaleString("vi-VN") : "" %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
 
-  <!-- Thống kê -->
-  <div class="stats">
-    <% 
-      const submittedUnits = units.filter(u => submissions[u]);
-      const notSubmittedUnits = units.filter(u => !submissions[u]);
-    %>
+          <!-- Bảng phụ: các bản ghi trước đó (chỉ hiển thị nếu có lịch sử) -->
+          <% if (history && Object.keys(history).length > 0) { %>
+            <h3>📜 Bảng phụ: Các bản ghi trước đó</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Đơn vị</th>
+                  <% fields.forEach(field => { %>
+                    <th><%= field %></th>
+                  <% }) %>
+                  <th>Thời gian nộp</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% for (const unit in history) {
+                     const arr = history[unit] || [];
+                     arr.forEach(sub => { %>
+                  <tr>
+                    <td><%= unit %></td>
+                    <% fields.forEach(field => { %>
+                      <td><%= sub && sub.data && sub.data[field] ? sub.data[field] : "" %></td>
+                    <% }) %>
+                    <td><%= sub && sub.submittedAt ? new Date(sub.submittedAt).toLocaleString("vi-VN") : "" %></td>
+                  </tr>
+                <% }) } %>
+              </tbody>
+            </table>
+          <% } %>
 
-    <h3>✅ Đơn vị đã nộp (<%= submittedUnits.length %>): 
-      <button class="copy-btn" onclick="copyText('submittedList')">Copy</button>
-    </h3>
-    <pre id="submittedList"><%= submittedUnits.join(", ") %></pre>
+          <!-- Thống kê -->
+          <div class="stats">
+            <% 
+              const submittedUnits = units.filter(u => latest && latest[u]);
+              const notSubmittedUnits = units.filter(u => !(latest && latest[u]));
+            %>
 
-    <h3>❌ Đơn vị chưa nộp (<%= notSubmittedUnits.length %>): 
-      <button class="copy-btn" onclick="copyText('notSubmittedList')">Copy</button>
-    </h3>
-    <pre id="notSubmittedList"><%= notSubmittedUnits.join(", ") %></pre>
-  </div>
+            <h3>✅ Đơn vị đã nộp (<%= submittedUnits.length %>): 
+              <button class="copy-btn" onclick="copyText('submittedList')">Copy</button>
+            </h3>
+            <pre id="submittedList"><%= submittedUnits.join(", ") %></pre>
 
- 
+            <h3>❌ Đơn vị chưa nộp (<%= notSubmittedUnits.length %>): 
+              <button class="copy-btn" onclick="copyText('notSubmittedList')">Copy</button>
+            </h3>
+            <pre id="notSubmittedList"><%= notSubmittedUnits.join(", ") %></pre>
+          </div>
 
-  <script>
-    function copyText(elementId) {
-      const text = document.getElementById(elementId).innerText;
-      navigator.clipboard.writeText(text).then(() => {
-        alert("Đã copy vào clipboard!");
-      });
-    }
-  </script>
-</body>
-</html>
+          <script>
+            function copyText(elementId) {
+              const text = document.getElementById(elementId).innerText;
+              navigator.clipboard.writeText(text).then(() => {
+                alert("Đã copy vào clipboard!");
+              });
+            }
+          </script>
+        </body>
+        </html>
