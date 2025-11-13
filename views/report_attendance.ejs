@@ -1,0 +1,43 @@
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Điểm danh báo cáo</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: center; }
+            th { background:#f2f2f2; }
+            td:first-child, th:first-child { text-align: left; }
+          </style>
+        </head>
+        <body>
+          <h2>📋 Điểm danh báo cáo</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Đơn vị</th>
+                <% (reports || []).forEach(function(r){ %>
+                  <th><%= r %></th>
+                <% }) %>
+              </tr>
+            </thead>
+            <tbody>
+              <% (units || []).forEach(function(u){ %>
+                <tr>
+                  <td><%= u %></td>
+                  <% (reports || []).forEach(function(r){ %>
+                    <td>
+                      <% if (mapReportToUnits && mapReportToUnits[r] && mapReportToUnits[r][u]) { %>
+                        X
+                      <% } else { %>
+                        &nbsp;
+                      <% } %>
+                    </td>
+                  <% }) %>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </body>
+        </html>
