@@ -12,6 +12,12 @@ dotenv.config();
 
 import admin from "firebase-admin";
 
+
+
+
+
+
+
 const serviceAccount = {
   type: "service_account",
   project_id: "xuangiangxdd",
@@ -119,9 +125,17 @@ async function getFileList() {
     if (url.includes("drive.google.com/file")) {
       url = convertDriveLink(url);
     }
-    return { name: r.name, url, type: r.type || "Khác" };
+    return {
+      name: r.name,
+      url,
+      type: r.type || "Khác",
+      summaryD: r.summaryD || "",
+      summaryE: r.summaryE || "",
+      summaryF: r.summaryF || ""
+    };
   });
 }
+
 
 function convertYouTubeLink(inputUrl) {
   try {
@@ -228,6 +242,24 @@ app.get("/type/:type", requireLogin, async (req, res) => {
   }
 });
 
+app.get("/mindmap/:name", requireLogin, async (req, res) => {
+  try {
+    const { name } = req.params;
+    const files = await getFileList();
+    const doc = files.find(f => f.name === name);
+    if (!doc) return res.status(404).send("Không tìm thấy văn bản");
+
+    // Gom dữ liệu D–F thành mảng
+    const summaries = [doc.summaryD, doc.summaryE, doc.summaryF].filter(Boolean);
+
+    res.render("mindmap", { doc, summaries });
+  } catch (err) {
+    console.error("Mindmap error:", err);
+    res.status(500).send("Không tải được mindmap");
+  }
+});
+
+
 // ====== Viewer route ======
 app.get("/viewer", requireLogin, async (req, res) => {
   const { url, name } = req.query;
@@ -320,6 +352,41 @@ app.get("/tts", async (req, res) => {
     res.status(500).send("Không lấy được audio TTS");
   }
 });
+
+
+app.get("/test-tokenizer", (req, res) => {
+  const sample = "Đảng ủy xã Xuân Giang tổ chức lễ dâng hương";
+  const result = tokenizer.segment(sample);
+  res.send(result.join(" "));
+});
+
+// ====== API: chuẩn hóa text  ======
+// server.js (hoặc app.js)
+// server.js
+
+// server.js
+
+import bodyParser from "body-parser";
+import { normalizeText } from "./viet-normalizer.js"; // nhớ thêm .js khi import ESM
+
+
+app.use(bodyParser.json());
+
+app.post("/api/normalize", (req, res) => {
+  const { text } = req.body;
+  if (!text || !text.trim()) {
+    return res.status(400).json({ error: "Thiếu text" });
+  }
+
+  const [normalized, logs] = normalizeText(text);
+  res.json({ normalized, logs });
+});
+
+
+
+
+
+
 
 
 
