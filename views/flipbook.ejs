@@ -405,7 +405,39 @@
           }
 
 
-          function buildItemChunks(items, maxCharsPerChunk = 200) {
+          // Hàm gọi API normalize ở server.js
+          async function normalizeText(rawText, pageNum, chunkIdx) {
+            try {
+              // Key cache theo trang + chunk
+              const key = `page_${pageNum}_chunk_${chunkIdx}`;
+
+              // 1. Kiểm tra cache
+              const cached = sessionStorage.getItem(key);
+              if (cached) {
+                console.log(`📦 Cache hit: ${key}`);
+                return cached;
+              }
+
+              // 2. Nếu chưa có cache thì gọi API
+              const res = await fetch("/api/normalize", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: rawText })
+              });
+              const data = await res.json();
+              const out = data.normalized || rawText;
+
+              // 3. Lưu vào cache
+              sessionStorage.setItem(key, out);
+              return out;
+            } catch (err) {
+              console.error("Normalize API error:", err);
+              return rawText;
+            }
+          }
+
+          // Viết lại buildItemChunks
+          async function buildItemChunks(items, maxCharsPerChunk = 200, pageNum = currentPage) {
             const chunks = [];
             let startIdx = 0;
 
@@ -424,61 +456,38 @@
               for (let i = startIdx; i < items.length; i++) {
                 const word = items[i].text;
                 const addLen = word.length + (i > startIdx ? 1 : 0);
-
-                if (accLen + addLen > maxCharsPerChunk) {
-                  break;
-                }
+                if (accLen + addLen > maxCharsPerChunk) break;
 
                 accLen += addLen;
                 endIdx = i;
-
-                if (isPunctuationEnd(word)) {
-                  lastPunctIdx = i;
-                }
+                if (isPunctuationEnd(word)) lastPunctIdx = i;
               }
 
-              if (lastPunctIdx >= startIdx) {
-                endIdx = lastPunctIdx;
-              }
+              if (lastPunctIdx >= startIdx) endIdx = lastPunctIdx;
+              if (endIdx < startIdx) endIdx = startIdx;
 
-              if (endIdx < startIdx) {
-                endIdx = startIdx;
-              }
+              const textForHighlight = items.slice(startIdx, endIdx + 1).map(it => it.text).join(" ");
+              const textForTTS = items.slice(startIdx, endIdx + 1).map(it => it.text).join(" ");
 
-              // 👉 text cho highlight (giữ nguyên join cũ)
-              const textForHighlight = items.slice(startIdx, endIdx + 1)
-                .map(it => it.text)
-                .join(" ");
-
-              // 👉 text cho TTS (join thông minh, không thêm space trước dấu câu)
-              const textForTTS = items.slice(startIdx, endIdx + 1)
-                .map(it => it.text)
-                .reduce((acc, cur) => {
-                  const t = cur.trim();
-                  if ([ ".", ",", ";", ":", "!", "?" ].includes(t)) {
-                    return acc + t;
-                  } else {
-                    return acc ? acc + " " + cur : cur;
-                  }
-                }, "");
+              // 👉 Gọi normalizeText với cache theo trang + chunk
+              const normalizedHighlight = await normalizeText(textForHighlight, pageNum, chunks.length);
+              const normalizedTTS = await normalizeText(textForTTS, pageNum, chunks.length);
 
               chunks.push({
                 start: startIdx,
                 end: endIdx,
-                text: textForHighlight, // dùng cho highlight
-                tts: textForTTS         // dùng cho TTS
+                text: normalizedHighlight,
+                tts: normalizedTTS
               });
-
-              // 👉 Log để kiểm tra
-              console.log(
-                `Chunk ${chunks.length - 1}: length=${textForTTS.length}, lastChar="${textForTTS.slice(-1)}"`
-              );
 
               startIdx = endIdx + 1;
             }
 
             return chunks;
           }
+
+
+
 
 
 
@@ -538,6 +547,7 @@
           }
 
           // ====== Reader Mode ======
+          // ====== Reader Mode ======
           async function showTextView(pageNum, chunks, items) {
             const textView = document.getElementById("textView");
             textView.innerHTML = "";
@@ -546,7 +556,10 @@
               const span = document.createElement("span");
               span.className = "chunk-span";
               span.dataset.idx = i;
-              span.textContent = chunk.map(idx => items[idx].str).join(" ");
+
+              // 👉 Dùng text đã chuẩn hóa từ chunk.tts
+              span.textContent = chunk.tts;
+
               textView.appendChild(span);
               textView.appendChild(document.createTextNode(" "));
             });
@@ -555,6 +568,7 @@
             textView.style.display = "block";
             document.body.classList.add("reader-active");
           }
+
 
           function setActiveChunkInTextView(i) {
             document.querySelectorAll(".chunk-span").forEach(el => el.classList.remove("active"));
@@ -586,7 +600,8 @@
             items = normalizeItems(items);
 
             // 👉 Chia chunk theo logic mới
-            const chunks = buildItemChunks(items, 200);
+            const chunks = await buildItemChunks(items, 200); // ✅ thêm await
+
 
             // 👉 Render highlight
             // 👉 Render timeline số đoạn
@@ -685,7 +700,8 @@
 
             let items = getItemsWithBoxes(textContent, viewport);
             items = normalizeItems(items);
-            const chunks = buildItemChunks(items, 200);
+            const chunks = await buildItemChunks(items, 200); // ✅ thêm await
+
 
             const textView = document.getElementById("textView");
             textView.innerHTML = "";
@@ -985,7 +1001,8 @@ let readerFontPx = 18;
 
             let items = getItemsWithBoxes(textContent, viewport);
             items = normalizeItems(items);
-            const chunks = buildItemChunks(items, 200);
+
+            const chunks = await buildItemChunks(items, 200); // ✅ Đảm bảo là mảng
 
             const textView = document.getElementById("textView");
             textView.innerHTML = "";
@@ -994,7 +1011,7 @@ let readerFontPx = 18;
               const span = document.createElement("span");
               span.className = "chunk-span";
               span.dataset.idx = i;
-              span.textContent = chunk.tts; // dùng text TTS đã join
+              span.textContent = chunk.tts || ""; // ✅ Luôn là chuỗi
               textView.appendChild(span);
               textView.appendChild(document.createTextNode(" "));
             });
@@ -1002,14 +1019,8 @@ let readerFontPx = 18;
             textView.style.setProperty('--readerFont', readerFontPx + "px");
             textView.style.display = "block";
             document.body.classList.add("reader-active");
-
-            // render timeline cho chế độ dễ đọc
-            renderChunkTimeline(chunks, items);
-
-            // lưu lại để playChunkFromIndex dùng
-            window.lastChunks = chunks;
-            window.lastItems = items;
           }
+
 
           function setActiveChunkInTextView(i) {
             document.querySelectorAll(".chunk-span").forEach(el => el.classList.remove("active"));
