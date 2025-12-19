@@ -38,7 +38,10 @@ export async function getPDFList() {
     .map(r => ({
       type: r.type || r.Type || r.loai || "Khác",
       name: r.name || r.Name || "Untitled",
-      url: r.url || r.URL || r.link || ""
+      url: r.url || r.URL || r.link || "",
+      summaryD: r.summaryD || r.D || r.tomtat1 || "",
+      summaryE: r.summaryE || r.E || r.tomtat2 || "",
+      summaryF: r.summaryF || r.F || r.tomtat3 || ""
     }))
     .filter(item => item.url);
 }
