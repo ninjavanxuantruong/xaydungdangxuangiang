@@ -114,8 +114,17 @@
                                style="background:#007bff; color:#fff; padding:10px 15px; border-radius:6px; text-decoration:none; font-weight:bold;">
                               ⬇️ Tải về
                             </a>
+                            <!-- Nút tóm tắt: chỉ hiện nếu có dữ liệu ở cột D/E/F -->
+                            <% if (doc.summaryD || doc.summaryE || doc.summaryF) { %>
+                              <a href="/mindmap/<%= encodeURIComponent(doc.name) %>"
+                                 style="background:#28a745; color:#fff; padding:10px 15px; border-radius:6px; text-decoration:none; font-weight:bold;">
+                                📑 Tóm tắt
+                              </a>
+                            <% } %>
+
                           </div>
                         </li>
+
                       <% }) %>
                     </ul>
 
