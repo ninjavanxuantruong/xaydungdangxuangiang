@@ -1,64 +1,76 @@
-      <!DOCTYPE html>
-      <html lang="vi">
-      <head>
-        <meta charset="UTF-8" />
-        <title>Đăng nhập</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link rel="stylesheet" href="/public/style.css" />
-        <style>
-          body { margin: 0; font-family: "Roboto", Arial, sans-serif; background: #fff; }
-          header.site-header { display: flex; align-items: center; background: #cc0000; color: #fff; padding: 10px 20px; }
-          header .logo img { height: 60px; margin-right: 15px; }
-          header .title h1 { margin: 0; font-size: 22px; font-weight: bold; }
-          header .title h2 { margin: 0; font-size: 16px; font-weight: normal; }
-          main { padding: 20px; max-width: 400px; margin: 40px auto; background: #f9f9f9; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-          h2.section-title { color: #cc0000; margin-bottom: 20px; text-align: center; }
-          .form-group { margin-bottom: 15px; }
-          label { display: block; margin-bottom: 6px; font-weight: bold; }
-          select, input[type="password"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-          .btn.primary { display: block; width: 100%; background: #d50000; color: #fff; border: none; padding: 10px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.3s; }
-          .btn.primary:hover { background: #a00000; }
-          .error { color: #d50000; margin-bottom: 15px; text-align: center; font-weight: bold; }
-        </style>
-      </head>
-      <body>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Đăng nhập</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="/public/style.css" />
+  <style>
+    body { margin: 0; font-family: "Roboto", Arial, sans-serif; background: #fff; }
+    header.site-header { display: flex; align-items: center; background: #cc0000; color: #fff; padding: 10px 20px; }
+    header .logo img { height: 60px; margin-right: 15px; }
+    header .title h1 { margin: 0; font-size: 22px; font-weight: bold; }
+    header .title h2 { margin: 0; font-size: 16px; font-weight: normal; }
+    main { padding: 20px; max-width: 400px; margin: 40px auto; background: #f9f9f9; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    h2.section-title { color: #cc0000; margin-bottom: 20px; text-align: center; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 6px; font-weight: bold; }
+    select, input[type="password"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+    .btn.primary { display: block; width: 100%; background: #d50000; color: #fff; border: none; padding: 10px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.3s; }
+    .btn.primary:hover { background: #a00000; }
+    .error { color: #d50000; margin-bottom: 15px; text-align: center; font-weight: bold; }
+  </style>
+</head>
+<body>
 
-        <header class="site-header">
-          <div class="logo">
-            <img src="https://raw.githubusercontent.com/ninjavanxuantruong/xaydungdangxuangiang/main/logo-%20dang-cong-san-vietnam-vector-1.png" alt="Logo Đảng" />
-          </div>
-          <div class="title">
-            <h1>PHẦM MỀM CÔNG TÁC ĐẢNG</h1>
-            <h2>BAN XÂY DỰNG ĐẢNG XÃ XUÂN GIANG</h2>
-          </div>
-        </header>
+  <header class="site-header">
+    <div class="logo">
+      <img src="https://raw.githubusercontent.com/ninjavanxuantruong/xaydungdangxuangiang/main/logo-%20dang-cong-san-vietnam-vector-1.png" alt="Logo Đảng" />
+    </div>
+    <div class="title">
+      <h1>PHẦN MỀM CÔNG TÁC ĐẢNG</h1>
+      <h2>BAN XÂY DỰNG ĐẢNG XÃ XUÂN GIANG</h2>
+    </div>
+  </header>
 
-        <main>
-          <h2 class="section-title">🔑 Đăng nhập</h2>
+  <main>
+    <h2 class="section-title">🔑 Đăng nhập</h2>
 
-          <% if (error) { %>
-            <div class="error"><%= error %></div>
-          <% } %>
+    <% if (error) { %>
+      <div class="error"><%= error %></div>
+    <% } %>
 
-          <form method="POST" action="/login" class="login-form">
-            <div class="form-group">
-              <label for="unit">Đơn vị</label>
-              <select id="unit" name="unit" required>
-                <% (units || []).forEach(function(u) { %>
-                  <option value="<%= u %>"><%= u %></option>
-                <% }) %>
-              </select>
-            </div>
+    <form method="POST" action="/login" class="login-form">
+      <div class="form-group">
+        <label for="unitSelect">Chọn đơn vị</label>
+        <select id="unitSelect" required onchange="document.getElementById('unitHidden').value = this.value">
+          <% (units || []).forEach(function(u) { %>
+            <option value="<%= u %>"><%= u %></option>
+          <% }) %>
+        </select>
+        <!-- hidden input để Chrome coi là username -->
+        <input type="hidden" name="unit" id="unitHidden" autocomplete="username">
+      </div>
 
-            <div class="form-group">
-              <label for="password">Mật khẩu</label>
-              <input type="password" id="password" name="password" />
+      <div class="form-group">
+        <label for="password">Mật khẩu</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" />
+      </div>
 
-            </div>
+      <button type="submit" class="btn primary">Đăng nhập</button>
+    </form>
+  </main>
 
-            <button type="submit" class="btn primary">Đăng nhập</button>
-          </form>
-        </main>
+  <script>
+    // Khi trang load, nếu Chrome đã tự điền hidden input thì đồng bộ lại với select
+    window.addEventListener("DOMContentLoaded", () => {
+      const hidden = document.getElementById("unitHidden");
+      const select = document.getElementById("unitSelect");
+      if (hidden.value) {
+        select.value = hidden.value;
+      }
+    });
+  </script>
 
-      </body>
-      </html>
+</body>
+</html>
