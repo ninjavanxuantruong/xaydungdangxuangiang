@@ -72,6 +72,141 @@
                           a.type-link:hover {
                             background: #a00000;
                           }
+
+                          
+                          
+                          .carousel-wrapper {
+                            position: relative;
+                            display: flex;
+                            align-items: center;
+                            overflow: hidden;
+                            margin-bottom: 2rem;
+                          }
+
+                          .carousel {
+                            display: flex;
+                            overflow-x: auto;
+                            scroll-behavior: smooth;
+                            gap: 1rem;
+                            padding: 1rem 0;
+                          }
+
+                          /* Card tin bài cho PC */
+                          .post-card {
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: space-between;
+                            min-width: calc((100% - 2rem) / 3); /* 3 card trên PC */
+                            max-width: calc((100% - 2rem) / 3);
+                            height: 350px;
+                            border: 1px solid #ccc;
+                            border-radius: 8px;
+                            padding: 10px;
+                            background: #f9f9f9;
+                            text-align: center;
+                            flex-shrink: 0;
+                          }
+
+                          .post-card img {
+                            max-width: 100%;
+                            border-radius: 4px;
+                            margin-bottom: 10px;
+                          }
+
+                          .post-title {
+                            font-size: 16px;
+                            font-weight: bold;
+                            margin: 10px 0;
+                            flex-grow: 1;
+                          }
+
+                          .type-link {
+                            margin-top: auto;
+                            display: inline-block;
+                            background: #d50000;
+                            color: #fff;
+                            padding: 6px 12px;
+                            border-radius: 4px;
+                            text-decoration: none;
+                            font-weight: bold;
+                            transition: background 0.3s;
+                          }
+
+                          .type-link:hover {
+                            background: #a00000;
+                          }
+
+                          .carousel-btn {
+                            background: #d00;
+                            color: white;
+                            border: none;
+                            padding: 0.5rem 1rem;
+                            font-size: 1.2rem;
+                            cursor: pointer;
+                            border-radius: 4px;
+                            position: absolute;
+                            top: 50%;
+                            transform: translateY(-50%);
+                            z-index: 10;
+                          }
+
+                          .carousel-btn.left {
+                            left: 5px;
+                          }
+
+                          .carousel-btn.right {
+                            right: 5px;
+                          }
+
+                          /* Card tin bài cho điện thoại */
+                          @media (max-width: 600px) {
+                            .post-card {
+                              min-width: calc((100% - 1rem) / 2); /* 2 card trên mobile */
+                              max-width: calc((100% - 1rem) / 2);
+                              height: 280px;
+                            }
+
+                            .carousel-btn {
+                              font-size: 1rem;
+                              padding: 0.3rem 0.6rem;
+                            }
+                          }
+
+                          .post-link {
+                            text-decoration: none;
+                            color: inherit;
+                            display: block;
+                          }
+
+                          .post-link:hover .post-title {
+                            color: #d50000; /* đổi màu tiêu đề khi hover */
+                          }
+                          .no-image {
+                            width: 100%;
+                            height: 150px;
+                            background: #eee;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 2em;
+                            color: #999;
+                          }
+
+                          .post-source {
+                            font-size: 0.9em;
+                            color: #666;
+                            margin-top: 4px;
+                          }
+
+
+
+
+
+
+
+
+                          
+
                         </style>
                       </head>
                       <body>
@@ -91,6 +226,137 @@
                         </header>
 
                         <main>
+
+                          <!-- Danh sách tin bài từ Fanpage -->
+                              <h2 class="section-title">📰 Tin bài mới</h2>
+                              <div class="carousel-wrapper">
+                                <button class="carousel-btn left">◀</button>
+                                <div class="carousel" id="news-carousel">
+                                  <p>⏳ Đang tải tin tức...</p>
+                                </div>
+                                <button class="carousel-btn right">▶</button>
+                              </div>
+
+                          <script>
+                            let currentIndex = 0;
+                            let postsData = [];
+
+                            // Xác định số card hiển thị theo kích thước màn hình
+                            function getVisibleCount() {
+                              return window.innerWidth <= 600 ? 2 : 3;
+                            }
+
+                            function renderCarousel() {
+                              const container = document.getElementById("news-carousel");
+                              container.innerHTML = "";
+
+                              if (postsData.length === 0) {
+                                container.innerHTML = "<p>❌ Không có tin bài nào.</p>";
+                                return;
+                              }
+
+                              const visibleCount = getVisibleCount();
+
+                              for (let i = 0; i < visibleCount; i++) {
+                                const index = (currentIndex + i) % postsData.length;
+                                const p = postsData[index];
+
+                                const card = document.createElement("div");
+                                card.className = "post-card";
+
+                                // Nếu có ảnh thì thêm ảnh, nếu không thì chỉ hiện tiêu đề
+                                card.innerHTML = `
+                                  <a href="/xemlink?url=${encodeURIComponent(p.link)}" class="post-link">
+                                    ${p.image 
+                                      ? `<img src="${p.image}" alt="Ảnh tin bài" />` 
+                                      : `<div class="no-image">📄</div>`}
+                                    ${p.image 
+                                      ? `<h3 class="post-title">${p.title}</h3>
+                                         <p class="post-source">${p.name || ""}</p>`   // ✅ TH1: crawl được → ảnh + title + name
+                                      : `<h3 class="post-title">${p.name || ""}</h3>
+                                         <p class="post-source">${p.link}</p>`         // ✅ TH2: không crawl được → name + link
+                                    }
+                                  </a>
+                                `;
+
+
+
+
+
+
+
+                                container.appendChild(card);
+                              }
+                            }
+
+
+                            // Hàm load tin tức với cache 1 tiếng
+                            function loadNews() {
+                              const cacheKey = "newsCache";
+                              const cacheTimeKey = "newsCacheTime";
+                              const now = Date.now();
+
+                              const cached = localStorage.getItem(cacheKey);
+                              const cachedTime = localStorage.getItem(cacheTimeKey);
+
+                              if (cached && cachedTime && (now - parseInt(cachedTime)) < 3600 * 1000) {
+                                // Cache còn hạn (< 1 tiếng)
+                                postsData = JSON.parse(cached);
+                                renderCarousel();
+                                console.log("✅ Dùng cache tin tức");
+                              } else {
+                                // Cache hết hạn hoặc chưa có → fetch lại
+                                fetch("/news")
+                                  .then(res => res.json())
+                                  .then(posts => {
+                                    postsData = posts || [];
+                                    localStorage.setItem(cacheKey, JSON.stringify(postsData));
+                                    localStorage.setItem(cacheTimeKey, now.toString());
+                                    renderCarousel();
+                                    console.log("🌐 Fetch tin tức mới");
+                                  });
+                              }
+                            }
+
+                            // Điều khiển carousel
+                            document.querySelector(".carousel-btn.left").onclick = () => {
+                              currentIndex = (currentIndex - 1 + postsData.length) % postsData.length;
+                              renderCarousel();
+                            };
+
+                            document.querySelector(".carousel-btn.right").onclick = () => {
+                              currentIndex = (currentIndex + 1) % postsData.length;
+                              renderCarousel();
+                            };
+
+                            // Khi resize màn hình thì render lại để đổi số card
+                            window.addEventListener("resize", renderCarousel);
+
+                            // Khi dashboard load thì gọi loadNews()
+                            window.addEventListener("DOMContentLoaded", loadNews);
+
+                          </script>
+                          <% if (user && user.unit !== "Đảng viên") { %>
+                            <h2 class="section-title"> 🤖 AI hỗ trợ công tác Đảng</h2>
+                            <div class="ai-support">
+                              <a href="/xemlink?url=<%= encodeURIComponent('https://notebooklm.google.com/notebook/f27b2e22-489c-4bd6-a7c3-16844b3b3551') %>" class="ai-link">
+                                Ấn vào ĐÂY để sử dụng A.I hỗ trợ
+                              </a>
+                            </div>
+                          <% } %>
+
+
+
+
+
+
+
+
+
+                          
+                          
+                          
+                          
                           <!-- Danh sách loại tài liệu -->
                           <h2 class="section-title">📂 Danh sách loại tài liệu</h2>
                           <% if (!types || types.length === 0) { %>
@@ -108,35 +374,42 @@
                           <% } %>
 
                           <!-- Danh sách báo cáo -->
-                          <h2 class="section-title">📝 Danh sách báo cáo</h2>
-                          <% if (!reports || reports.length === 0) { %>
-                            <p>❌ Không có báo cáo nào.</p>
-                          <% } else { %>
-                            <ul class="type-list">
-                              <% reports.forEach(r => { %>
-                                <li class="type-item">
-                                  <a class="type-link" href="/reports/<%= encodeURIComponent(r.name) %>">
-                                    <%= r.name %>
-                                  </a>
-                                </li>
-                              <% }) %>
-                            </ul>
-                          <% } %>
+                              <% if (user && user.unit !== "Đảng viên") { %>
+                                <h2 class="section-title">📝 Danh sách báo cáo</h2>
+                                <% if (!reports || reports.length === 0) { %>
+                                  <p>❌ Không có báo cáo nào.</p>
+                                <% } else { %>
+                                  <ul class="type-list">
+                                    <% reports.forEach(r => { %>
+                                      <li class="type-item">
+                                        <a class="type-link" href="/reports/<%= encodeURIComponent(r.name) %>">
+                                          <%= r.name %>
+                                        </a>
+                                      </li>
+                                    <% }) %>
+                                  </ul>
+                                <% } %>
+                              <% } %>
+
+
 
                           <!-- Kết quả báo cáo (chỉ Ban XDĐ mới thấy) -->
-                          <% if (user && user.unit === "Ban XDĐ" && submissions && submissions.length > 0) { %>
-                            <h2 class="section-title">📊 Kết quả báo cáo đã nộp</h2>
-                            <ul class="type-list">
-                              <% submissions.forEach(s => { %>
-                                <li class="type-item">
-                                  <a class="type-link" href="/reports/results/<%= s.id %>">
-                                    <strong><%= s.unit %></strong> - <%= s.reportName %><br/>
-                                    <small>Thời gian: <%= new Date(s.submittedAt).toLocaleString("vi-VN") %></small>
-                                  </a>
-                                </li>
-                              <% }) %>
-                            </ul>
-                          <% } %>
+                                <% if (user && user.unit === "Ban XDĐ" && submissions && submissions.length > 0) { %>
+                                  <h2 class="section-title">📊 Kết quả báo cáo đã nộp</h2>
+                                  <ul class="type-list">
+                                    <% submissions.forEach(s => { 
+                                         // chỉ hiển thị nếu có tên báo cáo hợp lệ
+                                         if (s && s.reportName) { %>
+                                      <li class="type-item">
+                                        <a class="type-link" href="/reports/results/<%= s.id %>">
+                                          <strong><%= s.unit %></strong> - <%= s.reportName %><br/>
+                                          <small>Thời gian: <%= new Date(s.submittedAt).toLocaleString("vi-VN") %></small>
+                                        </a>
+                                      </li>
+                                    <% } }) %>
+                                  </ul>
+                                <% } %>
+
 
                             <% if (user && user.unit === "Ban XDĐ") { %>
                               <h2 class="section-title">📋 Điểm danh báo cáo</h2>
@@ -147,9 +420,32 @@
                               </ul>
                             <% } %>
 
+                              <% if (user && user.unit === "Ban XDĐ") { %>
+                                <h2 class="section-title">📊 Thống kê lượt truy cập</h2>
+                                <ul class="type-list">
+                                  <li class="type-item">
+                                    <a class="type-link" href="/stats">Xem thống kê truy cập</a>
+                                  </li>
+                                </ul>
+                              <% } %>
+
+
 
 
                         </main>
+                              <script>
+                                // Khi dashboard load thì xoá cache flipbook
+                                window.addEventListener("DOMContentLoaded", () => {
+                                  // Xoá tất cả key bắt đầu bằng "page_"
+                                  Object.keys(sessionStorage).forEach(k => {
+                                    if (k.startsWith("page_")) {
+                                      sessionStorage.removeItem(k);
+                                      console.log("🗑️ Đã xoá cache:", k);
+                                    }
+                                  });
+                                });
+                              </script>
+
 
                       </body>
                       </html>
