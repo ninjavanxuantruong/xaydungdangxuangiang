@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Xem link</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    .back-btn {
+      display: inline-block;
+      margin-bottom: 20px;
+      padding: 8px 12px;
+      background: #007bff;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 4px;
+    }
+    .back-btn:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <a href="/dashboard" class="back-btn">⬅ Quay lại Dashboard</a>
+
+  <p>Đang mở link: <%= url %></p>
+
+  <script>
+    // Chuyển hướng sang link gốc trong cùng tab
+    window.location.href = "<%= url %>";
+  </script>
+</body>
+</html>
