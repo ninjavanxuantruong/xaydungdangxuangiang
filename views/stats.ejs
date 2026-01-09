@@ -1,0 +1,44 @@
+        <!DOCTYPE html>
+        <html lang="vi">
+        <head>
+          <meta charset="UTF-8">
+          <title>Thống kê truy cập theo tháng</title>
+          <style>
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid #ccc; padding: 8px; }
+            th { background: #f5f5f5; }
+          </style>
+        </head>
+        <body>
+          <h2>📊 Thống kê lượt truy cập theo tháng</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Tháng</th>
+                      <th>Tổng lượt</th>
+                      <th>Chi tiết</th>
+                      <th>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% stats.forEach(s => { %>
+                      <tr>
+                        <td><%= s.month %></td>
+                        <td><%= s.total %></td>
+                        <td>
+                          <% for (const [user, count] of Object.entries(s.users)) { %>
+                            <%= user %>: <%= count %><br/>
+                          <% } %>
+                        </td>
+                        <td>
+                          <form action="/stats/delete/<%= s.month %>" method="POST" onsubmit="return confirm('Xoá thống kê tháng <%= s.month %>?');">
+                            <button type="submit">🗑️ Xoá</button>
+                          </form>
+                        </td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+
+        </body>
+        </html>
