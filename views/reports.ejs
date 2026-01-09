@@ -17,18 +17,23 @@
   </style>
 </head>
 <body>
-  <h2>📑 Danh sách báo cáo</h2>
+  <h2>Danh sách báo cáo</h2>
   <ul>
-    <% if (reports && reports.length > 0) { %>
+    <% if (reports && reports.length) { %>
       <% reports.forEach(r => { %>
         <li>
-          <a href="/reports/<%= r.name %>"><%= r.name %></a>
+          <% if (r.url) { %>
+            <a href="/reports/results/<%= encodeURIComponent(r.name) %>"><%= r.displayName %></a>
+          <% } else { %>
+            <a href="/reports/results/<%= encodeURIComponent(r.name) %>"><%= r.displayName %></a>
+          <% } %>
         </li>
       <% }) %>
     <% } else { %>
-      <li>Không có báo cáo nào.</li>
+      <li>Chưa có báo cáo</li>
     <% } %>
   </ul>
+
 
   <p><a href="/">⬅ Quay lại trang chính</a></p>
 </body>
