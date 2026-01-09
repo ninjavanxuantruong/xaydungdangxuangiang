@@ -244,6 +244,13 @@
 
           
         </main>
+        <script>
+          window.currentPdfId = "<%- name %>";   // gán lên window để toàn bộ JS dùng được
+          console.log("currentPdfId =", window.currentPdfId);
+        </script>
+
+
+
 
         <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -288,7 +295,14 @@
 
           let pdfDoc = null;
           let currentPage = 1;
+          let currentPdfId = null;   // 👉 thêm biến này
+          
+          
           let playbackRate = 1.0;
+         
+
+         
+
 
           // Quản lý timeout highlight
           let activeTimeouts = [];
@@ -403,38 +417,97 @@
             }
             return result;
           }
+          // Hàm load toàn bộ dữ liệu PDF từ Firestore về sessionStorage
+          async function loadPdfData(pdfId) {
+            const docRef = firestore.collection("translated_pdfs").doc(pdfId);
+            const docSnap = await docRef.get();
+            if (docSnap.exists) {
+              const data = docSnap.data();
+              // Lưu toàn bộ vào sessionStorage theo từng page/chunk
+              Object.keys(data).forEach(pageKey => {
+                const pageData = data[pageKey];
+                Object.keys(pageData).forEach(chunkKey => {
+                  const text = pageData[chunkKey].text;
+                  sessionStorage.setItem(chunkKey, text);
+                });
+              });
+              console.log("📦 Loaded all pages from Firestore into sessionStorage");
+            }
+          }
+
+          
 
 
-          // Hàm gọi API normalize ở server.js
+          // Hàm gọi API normalize, đảm bảo cache theo từng pdfId
+          // Gọi API để load toàn bộ document một lần
+          async function loadDocument(pdfId) {
+            const encodedId = encodeURIComponent(pdfId);
+            const res = await fetch(`/flipbook/${encodedId}`);
+            const data = await res.json();
+            // Cache toàn bộ document vào sessionStorage
+            sessionStorage.setItem(pdfId, JSON.stringify(data));
+            return data;
+          }
+
+          // Lấy chunk từ cache đã lưu
+          function getChunkFromCache(pdfId, page, chunkIdx) {
+            const docData = JSON.parse(sessionStorage.getItem(pdfId) || "{}");
+            const chunk = docData[`page${page}`]?.[`chunk_${chunkIdx}`];
+            if (!chunk) return null;
+            // Luôn trả về chuỗi text
+            return typeof chunk === "string" ? chunk : chunk.text || null;
+          }
           async function normalizeText(rawText, pageNum, chunkIdx) {
             try {
-              // Key cache theo trang + chunk
-              const key = `page_${pageNum}_chunk_${chunkIdx}`;
-
-              // 1. Kiểm tra cache
-              const cached = sessionStorage.getItem(key);
-              if (cached) {
-                console.log(`📦 Cache hit: ${key}`);
-                return cached;
+              const pdfId = window.currentPdfId;
+              if (!pdfId) {
+                console.error("❌ pdfId is missing!");
+                return rawText;
               }
 
-              // 2. Nếu chưa có cache thì gọi API
-              const res = await fetch("/api/normalize", {
+              // 1. Thử lấy chunk từ cache
+              let chunk = getChunkFromCache(pdfId, pageNum, chunkIdx);
+              if (chunk) {
+                console.log("📦 Cache hit:", pdfId, pageNum, chunkIdx);
+                return chunk;
+              }
+
+              // 2. Nếu chưa có cache → load toàn bộ document một lần
+              const docData = await loadDocument(pdfId);
+              chunk = docData[`page${pageNum}`]?.[`chunk_${chunkIdx}`];
+              if (chunk) {
+                return typeof chunk === "string" ? chunk : chunk.text || rawText;
+              }
+
+              // 3. Nếu server chưa có thì normalize local rồi POST
+              const res2 = await fetch("/api/normalize", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ text: rawText })
               });
-              const data = await res.json();
-              const out = data.normalized || rawText;
+              const data2 = await res2.json();
+              const out = data2.normalized || rawText;
 
-              // 3. Lưu vào cache
-              sessionStorage.setItem(key, out);
+              // 4. Gửi lên server để lưu
+              const encodedId = encodeURIComponent(pdfId);
+              await fetch(`/flipbook/${encodedId}/${pageNum}/${chunkIdx}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: out })
+              });
+
               return out;
             } catch (err) {
-              console.error("Normalize API error:", err);
+              console.error("❌ Normalize API error:", err);
               return rawText;
             }
           }
+
+
+
+
+
+
 
           // Viết lại buildItemChunks
           async function buildItemChunks(items, maxCharsPerChunk = 200, pageNum = currentPage) {
@@ -596,40 +669,27 @@
               return;
             }
 
-            // 👉 Chuẩn hoá items: tách dấu câu thành item riêng
             items = normalizeItems(items);
+            const chunks = await buildItemChunks(items, 200);
 
-            // 👉 Chia chunk theo logic mới
-            const chunks = await buildItemChunks(items, 200); // ✅ thêm await
+            // normalize từng chunk và cache
+            for (let i = 0; i < chunks.length; i++) {
+              chunks[i].text = await normalizeText(chunks[i].text, currentPage, i);
+            }
 
-
-            // 👉 Render highlight
-            // 👉 Render timeline số đoạn
             renderChunkTimeline(chunks, items);
-
 
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             let stopRequested = false;
             let currentSource = null;
             let bufferQueue = [];
-            
 
             async function fetchBuffer(snippet) {
-              try {
-                const url = `/tts?q=${encodeURIComponent(snippet)}`;
-                console.log("🔊 Fetching TTS for:", snippet); // log để kiểm tra text gửi đi
-                const resp = await fetch(url);
-                if (!resp.ok) {
-                  throw new Error(`TTS request failed: ${resp.status}`);
-                }
-                const arrayBuffer = await resp.arrayBuffer();
-                return await audioCtx.decodeAudioData(arrayBuffer);
-              } catch (err) {
-                console.error("❌ fetchBuffer error:", err);
-                throw err;
-              }
+              const url = `/tts?q=${encodeURIComponent(snippet)}`;
+              const resp = await fetch(url);
+              const arrayBuffer = await resp.arrayBuffer();
+              return await audioCtx.decodeAudioData(arrayBuffer);
             }
-
 
             async function prefillQueue(startIndex, count = 3) {
               for (let j = 0; j < count && startIndex + j < chunks.length; j++) {
@@ -639,8 +699,6 @@
 
             async function playOne(i) {
               if (stopRequested || i >= chunks.length) return;
-
-              // nếu queue trống thì fetch
               if (bufferQueue.length === 0) {
                 bufferQueue.push(await fetchBuffer(chunks[i].text));
               }
@@ -658,10 +716,8 @@
                 setActiveChunkBlock(i);
               }
 
-
               source.onended = () => {
                 if (!stopRequested) {
-                  // prefetch thêm để queue luôn đầy
                   if (i + 3 < chunks.length) {
                     fetchBuffer(chunks[i + 3].text).then(buf => bufferQueue.push(buf));
                   }
@@ -673,7 +729,6 @@
               currentSource = source;
             }
 
-            // prefill queue trước khi phát
             await prefillQueue(0, 3);
             playOne(0);
 
@@ -700,8 +755,11 @@
 
             let items = getItemsWithBoxes(textContent, viewport);
             items = normalizeItems(items);
-            const chunks = await buildItemChunks(items, 200); // ✅ thêm await
+            const chunks = await buildItemChunks(items, 200);
 
+            for (let i = 0; i < chunks.length; i++) {
+              chunks[i].text = await normalizeText(chunks[i].text, pageNum, i);
+            }
 
             const textView = document.getElementById("textView");
             textView.innerHTML = "";
@@ -709,11 +767,12 @@
               const span = document.createElement("span");
               span.className = "chunk-span";
               span.dataset.idx = i;
-              span.textContent = chunk.tts;
+              span.textContent = chunk.text;
               textView.appendChild(span);
               textView.appendChild(document.createTextNode(" "));
             });
           }
+
 
 
 
