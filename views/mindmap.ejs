@@ -1,555 +1,977 @@
-                        <!DOCTYPE html>
-                        <html lang="vi">
-                        <head>
-                          <meta charset="UTF-8" />
-                          <title>Mindmap - <%= doc.name %></title>
-                          <meta name="viewport" content="width=device-width, initial-scale=1" />
-                          <link rel="stylesheet" href="/public/style.css" />
-
-                          <style>
-                            :root {
-                              --accent: #cc0000;
-                              --bg: #ffffff;
-                              --text: #222;
-                              --branch-size: 160px;
-                              --center-size: 180px;
-                              --radius-desktop: 240px;
-                              --radius-mobile: 140px;
-                            }
-
-                            body {
-                              margin: 0;
-                              font-family: "Roboto", Arial, sans-serif;
-                              background: var(--bg);
-                              color: var(--text);
-                            }
-
-                            header.site-header {
-                              display: flex;
-                              align-items: center;
-                              background: var(--accent);
-                              color: #fff;
-                              padding: 10px 20px;
-                            }
-                            header .logo img { height: 60px; margin-right: 15px; }
-                            header .title h1 { margin: 0; font-size: 22px; font-weight: bold; }
-                            header .title h2 { margin: 0; font-size: 16px; font-weight: normal; }
-                            .logout-btn {
-                              margin-left: auto; color: #fff; text-decoration: none; font-weight: bold;
-                              background: #a00000; padding: 6px 12px; border-radius: 4px;
-                            }
-
-                            main { padding: 16px; }
-                            .back-link {
-                              display: inline-block; margin-bottom: 12px; text-decoration: none;
-                              color: var(--accent); font-weight: bold;
-                            }
-                            h2.section-title { color: var(--accent); margin: 8px 0 20px; }
-
-                            /* Mindmap layout */
-                            .mindmap-wrap {
-                              position: relative;
-                              width: 100%;
-                              max-width: 1100px;
-                              margin: 0 auto;
-                              min-height: 560px;
-                              display: grid;
-                              place-items: center;
-                            }
-
-                            .center-node {
-                              position: absolute;
-                              width: var(--center-size);
-                              height: var(--center-size);
-                              border-radius: 50%;
-                              background: var(--accent);
-                              color: #fff;
-                              display: grid;
-                              place-items: center;
-                              text-align: center;
-                              font-weight: bold;
-                              box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-                              top: 50%;
-                              left: 50%;
-                              transform: translate(-50%, -50%);
-                              z-index: 10;
-                              padding: 12px;
-                            }
-
-                            .branch-node {
-                              position: absolute;
-                              width: var(--branch-size);
-                              min-height: 64px;
-                              border-radius: 12px;
-                              color: #fff;
-                              font-weight: 600;
-                              text-align: center;
-                              padding: 10px 12px;
-                              display: grid;
-                              place-items: center;
-                              box-shadow: 0 6px 16px rgba(0,0,0,0.12);
-                              cursor: pointer;
-                              transition: transform 0.2s ease, box-shadow 0.2s ease;
-                              user-select: none;
-                              /* Quan trọng: luôn căn tâm node tại tọa độ left/top */
-                              transform: translate(-50%, -50%);
-                            }
-                            .branch-node:hover {
-                              transform: translate(-50%, -50%) scale(1.03);
-                              box-shadow: 0 10px 24px rgba(0,0,0,0.18);
-                            }
-
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mindmap - <%= doc.name %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/public/style.css" />
+
+  <style>
+    :root {
+      --accent: #cc0000;
+      --bg: #ffffff;
+      --text: #222;
+      --branch-size: 160px;
+      --center-size: 180px;
+      --radius-desktop: 240px;
+      --radius-mobile: 140px;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Roboto", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header.site-header {
+      display: flex;
+      align-items: center;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 20px;
+    }
+    header .logo img { height: 60px; margin-right: 15px; }
+    header .title h1 { margin: 0; font-size: 22px; font-weight: bold; }
+    header .title h2 { margin: 0; font-size: 16px; font-weight: normal; }
+    .logout-btn {
+      margin-left: auto; color: #fff; text-decoration: none; font-weight: bold;
+      background: #a00000; padding: 6px 12px; border-radius: 4px;
+    }
+
+    main { padding: 16px; }
+    .back-link {
+      display: inline-block; margin-bottom: 12px; text-decoration: none;
+      color: var(--accent); font-weight: bold;
+    }
+    h2.section-title { color: var(--accent); margin: 8px 0 20px; }
+
+    /* Mindmap layout */
+    .mindmap-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      min-height: 560px;
+      display: grid;
+      place-items: center;
+    }
+
+    .center-node {
+      position: absolute;
+      width: var(--center-size);
+      height: var(--center-size);
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      font-weight: bold;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      padding: 12px;
+    }
+
+    .branch-node {
+      position: absolute;
+      width: var(--branch-size);
+      min-height: 64px;
+      border-radius: 12px;
+      color: #fff;
+      font-weight: 600;
+      text-align: center;
+      padding: 10px 12px;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      user-select: none;
+      /* Quan trọng: luôn căn tâm node tại tọa độ left/top */
+      transform: translate(-50%, -50%);
+    }
+    .branch-node:hover {
+      transform: translate(-50%, -50%) scale(1.03);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+    }
+
 
 
-                            /* connecting line using pseudo-element */
-                            .branch-node::before {
-                              content: "";
-                              position: absolute;
-                              width: 2px;
-                              background: rgba(0,0,0,0.2);
-                              top: 50%;
-                              left: 50%;
-                              transform-origin: top center;
-                            }
-                            .img-container {
-                              display: flex;
-                              justify-content: center; /* căn giữa ngang */
-                              margin-top: 10px;
-                            }
-                            .img-container img {
-                              max-width: 120px;
-                              height: auto;
-                            }
-                            .sub-text {
-                              text-align: justify;   /* căn đều hai đầu */
-                              line-height: 1.5;      /* khoảng cách dòng dễ đọc hơn */
-                              margin-bottom: 8px;    /* cách chữ với ảnh */
-                            }
-
-
-
-                            /* Popup */
-                            .overlay {
-                              display: none; position: fixed; inset: 0;
-                              background: rgba(0,0,0,0.5); z-index: 999;
-                            }
-
-                            .popup {
-                              display: none;
-                              position: fixed;
-                              top: 50%; left: 50%;
-                              transform: translate(-50%, -50%);
-                              background: #fff;
-                              border: 2px solid var(--accent);
-                              border-radius: 10px;
-                              width: 92%; max-width: 720px;
-                              max-height: 80vh;             /* giới hạn chiều cao popup */
-                              z-index: 1000;
-                              box-shadow: 0 12px 32px rgba(0,0,0,0.25);
-
-                              flex-direction: column;
-                              overflow: hidden;             /* không cho popup dài vô hạn */
-                            }
-
-                            .popup-content {
-                              flex: 1;
-                              overflow-y: auto;             /* nội dung dài thì cuộn */
-                              padding: 12px 18px;
-                            }
-                            .popup-content {
-                              -webkit-overflow-scrolling: touch;
-                            }
-
-
-                            .popup h3 {
-                              margin: 0 0 10px; color: var(--accent);
-                            }
-                            .popup ul {
-                              margin: 0; padding-left: 18px;
-                            }
-                            .popup-actions {
-                              display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px;
-                            }
-
-
-
-                            .btn {
-                              border: none; border-radius: 6px; padding: 8px 12px; font-weight: 600; cursor: pointer;
-                            }
-                            .btn-close { background: #666; color: #fff; }
-                            .btn-read { background: #28a745; color: #fff; }
-
-                            /* Responsive */
-                            @media (max-width: 768px) {
-                              :root {
-                                --branch-size: 18vw;   /* nhánh ~18% chiều rộng màn hình */
-                                --center-size: 22vw;   /* tâm ~22% chiều rộng màn hình */
-                              }
-                              .mindmap-wrap { min-height: 520px; }
-                            }
-                            @media (max-width: 480px) {
-                              :root {
-                                --branch-size: 22vw;   /* nhánh ~22% chiều rộng màn hình */
-                                --center-size: 26vw;   /* tâm ~26% chiều rộng màn hình */
-                              }
-                              .mindmap-wrap { min-height: 480px; }
-                            }
-
-                          </style>
-                        </head>
-                        <body>
-                          <header class="site-header">
-                            <div class="logo">
-                              <img src="https://raw.githubusercontent.com/ninjavanxuantruong/xaydungdangxuangiang/main/logo-%20dang-cong-san-vietnam-vector-1.png" alt="Logo Đảng" />
-                            </div>
-                            <div class="title">
-                              <h1>TƯ LIỆU CÔNG TÁC ĐẢNG</h1>
-                              <h2>BAN XÂY DỰNG ĐẢNG XÃ XUÂN GIANG</h2>
-                            </div>
-                            <% if (process.env.AUTH_MODE === "on") { %>
-                              <a href="/logout" class="logout-btn">Đăng xuất</a>
-                            <% } %>
-                          </header>
-
-                          <main>
-                            <a href="/type/<%= encodeURIComponent(doc.type) %>" class="back-link">⬅️ Quay lại</a>
-                            <h2 class="section-title">🧭 Mindmap cho: <%= doc.name %></h2>
-
-                            <div class="mindmap-wrap" id="mindmap">
-
-                              <div class="center-node">Nội dung chính</div>
-
-                              <%
-
-                                function cleanText(input) {
-                                  return input
-                                    .replace(/^[\s•·–—-]*o[\s]+/i, "")  // bỏ ký tự 'o' đầu dòng nếu có
-                                    .replace(/[•·]/g, "")               // bỏ các dấu chấm đầu dòng
-                                    .replace(/[–—-]/g, "")              // bỏ các loại gạch ngang dài/ngắn
-                                    .replace(/…/g, "")                  // bỏ dấu ba chấm đặc biệt
-                                    .replace(/\t+/g, " ")               // bỏ tab
-                                    .replace(/\s+/g, " ")               // gộp nhiều khoảng trắng thành 1
-                                    .replace(/\r?\n+/g, "\n")           // chuẩn hóa xuống dòng
-                                    .trim();                            // bỏ khoảng trắng đầu/cuối
-                                }
-
-
-
-
-                                // Tách nhiều phần chính trong mỗi khối summaries
-                                const blocks = [];
-                                summaries.forEach(block => {
-                                  const lines = String(block || "").split("\n").map(l => l.trim()).filter(Boolean);
-                                  let current = null;
-
-                                lines.forEach(line => {
-                                line = cleanText(line);
-                                if (line.startsWith("{") && line.endsWith("}")) {
-                                  if (current) blocks.push(current);
-                                  current = { main: line.replace(/[{}]/g, "").trim(), subs: [] };
-                                } else if (current) {
-                                  const subsText = line.replace(/##.*?##/g, "").trim();
-                                  const keywordMatch = line.match(/##(.*?)##/);
-                                  const keyword = keywordMatch ? keywordMatch[1].trim() : null;
-                                  current.subs.push({ text: subsText, keyword });
-                                }
-
-                                  });
-
-                                  // Push phần cuối cùng nếu có
-                                  if (current) blocks.push(current);
-                                });
-
-                                const total = blocks.length;
-                                const colors = ["#d50000", "#007bff", "#28a745", "#ff9800", "#9c27b0", "#00bcd4", "#795548", "#3f51b5"];
-                              %>
-
-
-                              <% 
-                                // Place branches around center with polar coordinates
-                                // Responsive radius via CSS variable read in JS; fallback here for SSR approx
-                                // We'll use data-position set here; JS will also draw connector lines
-                                const radiusDesktop = 240, radiusMobile = 140;
-                              %>
-
-                              <% blocks.forEach((b, idx) => { 
-                                  const angleDeg = (360 / total) * idx;
-                                  const angleRad = angleDeg * Math.PI / 180;
-                                  // Desktop default; JS will update positions on load/resize
-                                  const x = radiusDesktop * Math.cos(angleRad);
-                                  const y = radiusDesktop * Math.sin(angleRad);
-                              %>
-                                <div 
-                                  class="branch-node"
-                                  id="branch-<%= idx %>"
-                                  data-idx="<%= idx %>"
-                                  data-angle="<%= angleDeg %>"
-                                  style="background:<%= colors[idx % colors.length] %>; left:calc(50% + <%= x %>px); top:calc(50% + <%= y %>px);"
-                                  onclick="openPopup(<%= idx %>)"
-                                >
-                                  <%= b.main %>
-                                </div>
-
-                                <!-- Overlay + Popup -->
-                                <div class="overlay" id="overlay-<%= idx %>" onclick="closePopup(<%= idx %>)"></div>
-                                      <div class="popup" id="popup-<%= idx %>">
-                                        <div class="popup-actions">
-                                          <button class="btn btn-read" onclick="readSubs(<%= idx %>)">Đọc</button>
-                                          <button class="btn btn-close" onclick="closePopup(<%= idx %>)">Đóng</button>
-                                        </div>
-
-                                        <h3><%= b.main %></h3>
-
-                                        <div class="popup-content">
-                                          <% if (b.subs && b.subs.length) { %>
-                                            <ul>
-                                              <% b.subs.forEach(s => { %>
-                                                <li>
-                                                  <div class="sub-text"><%= s.text %></div>
-                                                  <% if (s.keyword) { %>
-                                                    <div class="img-container" data-key="<%= s.keyword %>"></div>
-                                                  <% } %>
-                                                </li>
-                                              <% }) %>
-                                            </ul>
-                                          <% } else { %>
-                                            <p>Không có nội dung phụ.</p>
-                                          <% } %>
-                                        </div>
-                                      </div>
-
-
-                              <% }) %>
-                            </div>
-                          </main>
-
-                          <script>
-                            // Client-side: responsive positioning and connector line lengths
-                            let currentSource = null;
-
-                            (function() {
-                              const branches = document.querySelectorAll('.branch-node');
-                              const center = document.querySelector('.center-node');
-
-                              function radius() {
-                                if (window.innerWidth <= 480) return 200;   // bán kính lớn hơn cho mobile
-                                if (window.innerWidth <= 768) return 220;   // tablet
-                                return 240;                                 // PC giữ nguyên
-                              }
-
-
-                              function positionBranches() {
-                                const rect = center.getBoundingClientRect();
-                                const cx = rect.left + rect.width / 2;
-                                const cy = rect.top + rect.height / 2;
-                                const R = radius();
-
-                                branches.forEach(el => {
-                                  const idx = Number(el.dataset.idx);
-                                  const angleDeg = Number(el.dataset.angle);
-                                  const rad = angleDeg * Math.PI / 180;
-
-                                  const x = R * Math.cos(rad);
-                                  const y = R * Math.sin(rad);
-
-                                  el.style.left = `calc(50% + ${x}px)`;
-                                  el.style.top  = `calc(50% + ${y}px)`;
-
-                                  // connector line length/orientation
-                                  const bx = el.getBoundingClientRect().left + el.offsetWidth / 2;
-                                  const by = el.getBoundingClientRect().top + el.offsetHeight / 2;
-                                  const dx = cx - bx;
-                                  const dy = cy - by;
-                                  const length = Math.sqrt(dx*dx + dy*dy);
-                                  const angle = Math.atan2(dy, dx);
-
-                                  const line = el.style;
-                                  const before = window.getComputedStyle(el, '::before');
-                                  // We can't set pseudo-element styles from JS directly;
-                                  // Instead, set CSS vars per element via inline style and use them in CSS if desired,
-                                  // or approximate by transforming the node itself. For simplicity, we won't draw a true line here.
-                                  // If you want real lines, prefer SVG below.
-
-                                  // Optional: draw SVG connectors
-                                });
-                              }
-
-                              window.addEventListener('load', positionBranches);
-                              window.addEventListener('resize', positionBranches);
-                            })();
-
-                            // TTS read: concatenate subs and hit /tts
-                            function splitText(text, maxLen = 200) {
-                              const chunks = [];
-                              let remaining = text.trim();
-                              while (remaining.length > 0) {
-                                chunks.push(remaining.slice(0, maxLen));
-                                remaining = remaining.slice(maxLen);
-                              }
-                              return chunks;
-                            }
-                            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-                            async function fetchBuffer(snippet) {
-                              const resp = await fetch('/tts?q=' + encodeURIComponent(snippet));
-                              const arrayBuffer = await resp.arrayBuffer();
-                              return await audioCtx.decodeAudioData(arrayBuffer);
-                            }
-                            async function readSubs(i) {
-                              // Dừng audio cũ nếu có
-                              if (currentSource) {
-                                try { currentSource.stop(); } catch (e) {}
-                                currentSource.disconnect();
-                                currentSource = null;
-                              }
-
-                              const popup = document.getElementById('popup-' + i);
-                              const title = popup.querySelector('h3')?.textContent || '';
-                              const lines = Array.from(popup.querySelectorAll('li')).map(li => li.textContent.trim());
-                              const text = (title + '. ' + (lines.join('. '))).trim();
-
-                              const chunks = splitText(text, 200);
-                              const buffers = [];
-
-                              for (const chunk of chunks) {
-                                const buf = await fetchBuffer(chunk);
-                                buffers.push(buf);
-                              }
-
-                              const totalLength = buffers.reduce((sum, b) => sum + b.length, 0);
-                              const merged = audioCtx.createBuffer(
-                                buffers[0].numberOfChannels,
-                                totalLength,
-                                buffers[0].sampleRate
-                              );
-
-                              let offset = 0;
-                              buffers.forEach(b => {
-                                for (let channel = 0; channel < b.numberOfChannels; channel++) {
-                                  merged.getChannelData(channel).set(b.getChannelData(channel), offset);
-                                }
-                                offset += b.length;
-                              });
-
-                              // Phát audio mới
-                              const source = audioCtx.createBufferSource();
-                              source.buffer = merged;
-                              source.connect(audioCtx.destination);
-                              source.start();
-
-                              currentSource = source;
-                            }
-
-
-
-
-
-
-                            // Cache kết quả theo keyword để không fetch lại
-                            const imageCache = new Map();
-
-                            function insertImage(url, container) {
-                              // Nếu đã có img bên trong thì không chèn thêm
-                              if (container.querySelector('img')) return;
-
-                              const img = document.createElement('img');
-                              img.src = url;
-                              img.alt = 'minh họa';
-                              img.style.maxWidth = '120px';
-                              img.style.marginTop = '5px';
-                              container.appendChild(img);
-
-                              // Thêm dòng chú thích dưới ảnh
-                              const caption = document.createElement('div');
-                              caption.textContent = "(Ảnh AI minh hoạ)";
-                              caption.style.fontSize = "12px";
-                              caption.style.color = "#666";
-                              caption.style.marginTop = "3px";
-                              caption.style.fontStyle = "italic";
-                              container.appendChild(caption);
-                            }
-
-
-                            async function loadImage(keyword, container) {
-                              console.log("Keyword gọi ảnh:", keyword);  // In ra keyword để kiểm tra
-                              // Nếu đã có ảnh thì thôi
-                              if (container.querySelector('img')) return;
-
-                              // Nếu đã cache thì dùng lại
-                              if (imageCache.has(keyword)) {
-                                insertImage(imageCache.get(keyword), container);
-                                return;
-                              }
-
-                              // Tránh gọi trùng khi đang loading
-                              if (container.dataset.loading === 'true') return;
-                              container.dataset.loading = 'true';
-
-                              try {
-                                const resp = await fetch(
-                                  `https://pixabay.com/api/?key=51268254-554135d72f1d226beca834413&q=${encodeURIComponent(keyword)}&image_type=photo&category=technology`
-                                );
-                                const data = await resp.json();
-                                if (data.hits && data.hits.length > 0) {
-                                  // Có thể chọn ảnh khớp tags hơn, nếu không thì lấy ảnh đầu tiên
-                                  const hit = data.hits.find(h => h.tags.toLowerCase().includes(keyword.toLowerCase())) || data.hits[0];
-                                  const url = hit.webformatURL;
-                                  imageCache.set(keyword, url);
-                                  insertImage(url, container);
-                                }
-                              } finally {
-                                container.dataset.loading = 'false';
-                              }
-                            }
-
-
-                            // Khi mở popup, load ảnh cho các keyword
-                            function openPopup(i) {
-                              // Ẩn tất cả overlay + popup trước
-                              document.querySelectorAll('.overlay').forEach(el => el.style.display = 'none');
-                              document.querySelectorAll('.popup').forEach(el => el.style.display = 'none');
-
-                              // Hiện overlay + popup mục tiêu
-                              const overlay = document.getElementById("overlay-" + i);
-                              const popup   = document.getElementById("popup-" + i);
-                              if (overlay) overlay.style.display = "block";
-                              if (popup)   popup.style.display   = "flex"; // giữ layout flex để cuộn nội dung
-
-                              // Chỉ load ảnh nếu chưa có ảnh trong container
-                              document.querySelectorAll(`#popup-${i} .img-container`).forEach(el => {
-                                const key = el.dataset.key;
-                                if (!el.querySelector('img')) {
-                                  loadImage(key, el);
-                                }
-                              });
-                            }
-
-
-
-                            function closePopup(i) {
-                              // Ẩn overlay và popup
-                              document.getElementById("overlay-" + i).style.display = "none";
-                              document.getElementById("popup-" + i).style.display = "none";
-
-                              // Nếu đang có audio phát thì dừng lại
-                              if (currentSource) {
-                                try { 
-                                  currentSource.stop(); 
-                                } catch (e) {}
-                                currentSource.disconnect();
-                                currentSource = null;
-                              }
-                            }
-
-                          </script>
-
-                          <!-- Optional: SVG connectors for nicer lines -->
-                          <script>
-                            (function() {
-                              // If you want true lines connecting center and branches, you can inject an SVG and draw lines dynamically.
-                              // Skipped here to keep the template self-contained and simple.
-                            })();
-                          </script>
-                        </body>
-                        </html>
-
+    /* connecting line using pseudo-element */
+    .branch-node::before {
+      content: "";
+      position: absolute;
+      width: 2px;
+      background: rgba(0,0,0,0.2);
+      top: 50%;
+      left: 50%;
+      transform-origin: top center;
+    }
+    .img-container {
+      display: flex;
+      justify-content: center; /* căn giữa ngang */
+      margin-top: 10px;
+    }
+    .img-container img {
+      max-width: 120px;
+      height: auto;
+    }
+    .sub-text {
+      text-align: justify;   /* căn đều hai đầu */
+      line-height: 1.5;      /* khoảng cách dòng dễ đọc hơn */
+      margin-bottom: 8px;    /* cách chữ với ảnh */
+    }
+
+
+
+    /* Popup */
+    .overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 999;
+    }
+
+    .popup {
+      display: none;
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      border: 2px solid var(--accent);
+      border-radius: 10px;
+      width: 92%; max-width: 720px;
+      max-height: 80vh;             /* giới hạn chiều cao popup */
+      z-index: 1000;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+
+      flex-direction: column;
+      overflow: hidden;             /* không cho popup dài vô hạn */
+    }
+
+    .popup-content {
+      flex: 1;
+      overflow-y: auto;             /* nội dung dài thì cuộn */
+      padding: 12px 18px;
+    }
+    .popup-content {
+      -webkit-overflow-scrolling: touch;
+    }
+
+
+    .popup h3 {
+      margin: 0 0 10px; color: var(--accent);
+    }
+    .popup ul {
+      margin: 0; padding-left: 18px;
+    }
+    .popup-actions {
+      display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px;
+    }
+
+
+
+    .btn {
+      border: none; border-radius: 6px; padding: 8px 12px; font-weight: 600; cursor: pointer;
+    }
+    .btn-close { background: #666; color: #fff; }
+    .btn-read { background: #28a745; color: #fff; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      :root {
+        --branch-size: 18vw;   /* nhánh ~18% chiều rộng màn hình */
+        --center-size: 22vw;   /* tâm ~22% chiều rộng màn hình */
+      }
+      .mindmap-wrap { min-height: 520px; }
+    }
+    @media (max-width: 480px) {
+      :root {
+        --branch-size: 22vw;   /* nhánh ~22% chiều rộng màn hình */
+        --center-size: 26vw;   /* tâm ~26% chiều rộng màn hình */
+      }
+      .mindmap-wrap { min-height: 480px; }
+    }
+
+
+
+    /* Zoom sâu và chậm hơn: scale 2.0 */
+    /* Zoom sâu 3.0 tại điểm bất kỳ (sẽ random bằng JS) */
+    @keyframes zoomInOut {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(3.0); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes zoomOutIn {
+      0%   { transform: scale(3.0); }
+      50%  { transform: scale(1); }
+      100% { transform: scale(3.0); }
+    }
+
+    /* Zoom tại góc trái rồi di chuyển sang phải */
+    /* Zoom tại góc trái rồi di chuyển sang phải, sau đó zoom out */
+    /* Zoom tại góc trái rồi di chuyển sang phải, sau đó zoom out */
+    /* Zoom tại góc trái rồi di chuyển sang phải, sau đó zoom out */
+    @keyframes slideLeftRight {
+      0%   { transform: scale(1) translateX(0); }
+      25%  { transform: scale(2.0) translateX(0); transform-origin: left center; }
+      75%  { transform: scale(2.0) translateX(-50%); transform-origin: left center; }
+      100% { transform: scale(1) translateX(0); }
+    }
+
+    /* Zoom tại góc phải rồi di chuyển sang trái, sau đó zoom out */
+    @keyframes slideRightLeft {
+      0%   { transform: scale(1) translateX(0); }
+      25%  { transform: scale(2.0) translateX(0); transform-origin: right center; }
+      75%  { transform: scale(2.0) translateX(50%); transform-origin: right center; }
+      100% { transform: scale(1) translateX(0); }
+    }
+
+    /* Zoom tại phía trên rồi di chuyển xuống dưới, sau đó zoom out */
+    @keyframes slideTopBottom {
+      0%   { transform: scale(1) translateY(0); }
+      25%  { transform: scale(2.0) translateY(0); transform-origin: top center; }
+      75%  { transform: scale(2.0) translateY(-50%); transform-origin: top center; }
+      100% { transform: scale(1) translateY(0); }
+    }
+
+    /* Zoom tại phía dưới rồi di chuyển lên trên, sau đó zoom out */
+    @keyframes slideBottomTop {
+      0%   { transform: scale(1) translateY(0); }
+      25%  { transform: scale(2.0) translateY(0); transform-origin: bottom center; }
+      75%  { transform: scale(2.0) translateY(50%); transform-origin: bottom center; }
+      100% { transform: scale(1) translateY(0); }
+    }
+
+
+
+
+
+
+
+    /* Class chung để áp dụng animation */
+    .branch-anim {
+      animation-duration: 5s;
+      animation-iteration-count: 1;
+      animation-fill-mode: forwards;
+    }
+
+
+    #slides-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      position: relative;
+    }
+
+    .slide {
+      width: 100%;
+      height: 100%;
+      overflow: hidden; /* chặn ảnh vượt khung */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .slide img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+
+
+    .caption {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      color: #666;
+      font-style: italic;
+    }
+    .btn-start {
+      color: #fff;          /* chữ trắng */
+      background-color: #06c; /* nền xanh dương */
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-start:hover {
+      background-color: #005bb5; /* hover đậm hơn */
+    }
+
+
+
+
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="logo">
+      <img src="https://raw.githubusercontent.com/ninjavanxuantruong/xaydungdangxuangiang/main/logo-%20dang-cong-san-vietnam-vector-1.png" alt="Logo Đảng" />
+    </div>
+    <div class="title">
+      <h1>TƯ LIỆU CÔNG TÁC ĐẢNG</h1>
+      <h2>BAN XÂY DỰNG ĐẢNG XÃ XUÂN GIANG</h2>
+    </div>
+    <% if (process.env.AUTH_MODE === "on") { %>
+      <a href="/logout" class="logout-btn">Đăng xuất</a>
+    <% } %>
+  </header>
+
+  <main>
+    <a href="/type/<%= encodeURIComponent(doc.type) %>" class="back-link">⬅️ Quay lại</a>
+    <h2 class="section-title">🧭 Mindmap cho: <%= doc.name %></h2>
+
+    <div class="mindmap-wrap" id="mindmap">
+
+      <div class="center-node" onclick="openMainSlide()">Nội dung chính</div>
+
+
+      <%
+
+        function cleanText(input) {
+          return input
+            .replace(/^[\s•·–—-]*o[\s]+/i, "")  // bỏ ký tự 'o' đầu dòng nếu có
+            .replace(/[•·]/g, "")               // bỏ các dấu chấm đầu dòng
+            .replace(/[–—-]/g, "")              // bỏ các loại gạch ngang dài/ngắn
+            .replace(/…/g, "")                  // bỏ dấu ba chấm đặc biệt
+            .replace(/\t+/g, " ")               // bỏ tab
+            .replace(/\s+/g, " ")               // gộp nhiều khoảng trắng thành 1
+            .replace(/\r?\n+/g, "\n")           // chuẩn hóa xuống dòng
+            .trim();                            // bỏ khoảng trắng đầu/cuối
+        }
+
+
+
+
+        // Tách nhiều phần chính trong mỗi khối summaries
+        const blocks = [];
+        summaries.forEach(block => {
+          const lines = String(block || "").split("\n").map(l => l.trim()).filter(Boolean);
+          let current = null;
+
+        lines.forEach(line => {
+        line = cleanText(line);
+        if (line.startsWith("{") && line.endsWith("}")) {
+          if (current) blocks.push(current);
+          current = { main: line.replace(/[{}]/g, "").trim(), subs: [] };
+        } else if (current) {
+          const subsText = line.replace(/##.*?##/g, "").trim();
+          const keywordMatch = line.match(/##(.*?)##/);
+          const keyword = keywordMatch ? keywordMatch[1].trim() : null;
+          current.subs.push({ text: subsText, keyword });
+        }
+
+          });
+
+          // Push phần cuối cùng nếu có
+          if (current) blocks.push(current);
+        });
+
+        const total = blocks.length;
+        const colors = ["#d50000", "#007bff", "#28a745", "#ff9800", "#9c27b0", "#00bcd4", "#795548", "#3f51b5"];
+      %>
+
+
+      <% 
+        // Place branches around center with polar coordinates
+        // Responsive radius via CSS variable read in JS; fallback here for SSR approx
+        // We'll use data-position set here; JS will also draw connector lines
+        const radiusDesktop = 240, radiusMobile = 140;
+      %>
+
+      <% blocks.forEach((b, idx) => { 
+          const angleDeg = (360 / total) * idx;
+          const angleRad = angleDeg * Math.PI / 180;
+          // Desktop default; JS will update positions on load/resize
+          const x = radiusDesktop * Math.cos(angleRad);
+          const y = radiusDesktop * Math.sin(angleRad);
+      %>
+        <div 
+          class="branch-node"
+          id="branch-<%= idx %>"
+          data-idx="<%= idx %>"
+          data-angle="<%= angleDeg %>"
+          style="background:<%= colors[idx % colors.length] %>; left:calc(50% + <%= x %>px); top:calc(50% + <%= y %>px);"
+          onclick="openPopup(<%= idx %>)"
+        >
+          <%= b.main %>
+        </div>
+
+        <!-- Overlay + Popup -->
+        <div class="overlay" id="overlay-<%= idx %>" onclick="closePopup(<%= idx %>)"></div>
+              <div class="popup" id="popup-<%= idx %>">
+                <div class="popup-actions">
+                  <button class="btn btn-read" onclick="readSubs(<%= idx %>)">Đọc</button>
+                  <button class="btn btn-close" onclick="closePopup(<%= idx %>)">Đóng</button>
+                </div>
+
+                <h3><%= b.main %></h3>
+
+                <div class="popup-content">
+                  <% if (b.subs && b.subs.length) { %>
+                    <ul>
+                      <% b.subs.forEach(s => { %>
+                        <li>
+                          <div class="sub-text"><%= s.text %></div>
+                          <% if (s.keyword) { %>
+                            <div class="img-container" data-key="<%= s.keyword %>"></div>
+                          <% } %>
+                        </li>
+                      <% }) %>
+                    </ul>
+                  <% } else { %>
+                    <p>Không có nội dung phụ.</p>
+                  <% } %>
+                </div>
+              </div>
+
+
+      <% }) %>
+    </div>
+  </main>
+        <!-- Popup slideshow cho Nội dung chính -->
+        <!-- Popup slideshow cho Nội dung chính -->
+        <div class="overlay" id="overlay-main" onclick="closePopup('main')"></div>
+        <div class="popup" id="popup-main">
+          <div class="popup-actions">
+            <button class="btn btn-read" onclick="readMain()">Đọc</button>
+            <!-- ✅ Thêm nút Trình chiếu ở đây -->
+            <button class="btn btn-start" id="start-main-btn" style="display:none;">▶️ Trình chiếu</button>
+            <button class="btn btn-close" onclick="closePopup('main')">Đóng</button>
+          </div>
+          <div class="popup-content" id="slides-container">
+            <div class="caption">(Ảnh AI minh hoạ)</div>
+          </div>
+        </div>
+
+
+
+  <script>
+    // Client-side: responsive positioning and connector line lengths
+    let currentSource = null;
+
+    (function() {
+      const branches = document.querySelectorAll('.branch-node');
+      const center = document.querySelector('.center-node');
+
+      function radius() {
+        if (window.innerWidth <= 480) return 200;   // bán kính lớn hơn cho mobile
+        if (window.innerWidth <= 768) return 220;   // tablet
+        return 240;                                 // PC giữ nguyên
+      }
+
+
+      function positionBranches() {
+        const rect = center.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const R = radius();
+
+        branches.forEach(el => {
+          const idx = Number(el.dataset.idx);
+          const angleDeg = Number(el.dataset.angle);
+          const rad = angleDeg * Math.PI / 180;
+
+          const x = R * Math.cos(rad);
+          const y = R * Math.sin(rad);
+
+          el.style.left = `calc(50% + ${x}px)`;
+          el.style.top  = `calc(50% + ${y}px)`;
+
+          // connector line length/orientation
+          const bx = el.getBoundingClientRect().left + el.offsetWidth / 2;
+          const by = el.getBoundingClientRect().top + el.offsetHeight / 2;
+          const dx = cx - bx;
+          const dy = cy - by;
+          const length = Math.sqrt(dx*dx + dy*dy);
+          const angle = Math.atan2(dy, dx);
+
+          const line = el.style;
+          const before = window.getComputedStyle(el, '::before');
+          // We can't set pseudo-element styles from JS directly;
+          // Instead, set CSS vars per element via inline style and use them in CSS if desired,
+          // or approximate by transforming the node itself. For simplicity, we won't draw a true line here.
+          // If you want real lines, prefer SVG below.
+
+          // Optional: draw SVG connectors
+        });
+      }
+
+      window.addEventListener('load', positionBranches);
+      window.addEventListener('resize', positionBranches);
+    })();
+
+    // TTS read: concatenate subs and hit /tts
+    function splitText(text, maxLen = 200) {
+      const normalized = text.normalize('NFC').trim(); // chuẩn hóa Unicode tiếng Việt
+      const sentences = normalized.split(/(?<=[.?!…])\s+/); // tách theo câu
+
+      const chunks = [];
+      let buf = '';
+
+      for (const s of sentences) {
+        // Nếu câu quá dài thì fallback cắt theo từ
+        if (s.length > maxLen) {
+          const words = s.split(/\s+/);
+          let line = '';
+          for (const w of words) {
+            if ((line + ' ' + w).trim().length > maxLen) {
+              if (line) chunks.push(line.trim());
+              line = w;
+            } else {
+              line = (line ? line + ' ' : '') + w;
+            }
+          }
+          if (line) chunks.push(line.trim());
+          continue;
+        }
+
+        // Gom câu vào buffer cho đến khi đạt maxLen
+        if ((buf + ' ' + s).trim().length > maxLen) {
+          if (buf) chunks.push(buf.trim());
+          buf = s;
+        } else {
+          buf = (buf ? buf + ' ' : '') + s;
+        }
+      }
+
+      if (buf) chunks.push(buf.trim());
+      return chunks;
+    }
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+
+    async function fetchBuffer(snippet) {
+      const resp = await fetch('/tts?q=' + encodeURIComponent(snippet));
+      const arrayBuffer = await resp.arrayBuffer();
+      return await audioCtx.decodeAudioData(arrayBuffer);
+    }
+    async function readSubs(i) {
+      // Dừng audio cũ nếu có
+      if (currentSource) {
+        try { currentSource.stop(); } catch (e) {}
+        try { currentSource.disconnect(); } catch (e) {}
+        currentSource = null;
+      }
+
+      const popup = document.getElementById('popup-' + i);
+      const title = popup.querySelector('h3')?.textContent || '';
+      const lines = Array.from(popup.querySelectorAll('li')).map(li => li.textContent.trim());
+      const text = (title + '. ' + (lines.join('. '))).trim();
+
+      const chunks = splitText(text, 200);
+      const buffers = [];
+
+      for (const chunk of chunks) {
+        const buf = await fetchBuffer(chunk);
+        buffers.push(buf);
+      }
+
+      const totalLength = buffers.reduce((sum, b) => sum + b.length, 0);
+      const merged = audioCtx.createBuffer(
+        buffers[0].numberOfChannels,
+        totalLength,
+        buffers[0].sampleRate
+      );
+
+      let offset = 0;
+      buffers.forEach(b => {
+        for (let channel = 0; channel < b.numberOfChannels; channel++) {
+          merged.getChannelData(channel).set(b.getChannelData(channel), offset);
+        }
+        offset += b.length;
+      });
+
+      // 🔑 Quan trọng: kích hoạt AudioContext trước khi phát
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
+
+      // Phát audio mới
+      const source = audioCtx.createBufferSource();
+      source.buffer = merged;
+      source.connect(audioCtx.destination);
+      source.start();
+
+      currentSource = source;
+    }
+
+
+
+
+
+
+
+    // Cache kết quả theo keyword để không fetch lại
+    const imageCache = new Map();
+
+    function insertImage(url, container) {
+      // Nếu đã có img bên trong thì không chèn thêm
+      if (container.querySelector('img')) return;
+
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = 'minh họa';
+      img.style.maxWidth = '120px';
+      img.style.marginTop = '5px';
+      container.appendChild(img);
+
+      // Thêm dòng chú thích dưới ảnh
+      const caption = document.createElement('div');
+      caption.textContent = "(Ảnh AI minh hoạ)";
+      caption.style.fontSize = "12px";
+      caption.style.color = "#666";
+      caption.style.marginTop = "3px";
+      caption.style.fontStyle = "italic";
+      container.appendChild(caption);
+    }
+
+
+    async function loadImage(keyword, container) {
+      console.log("Keyword gọi ảnh:", keyword);  // In ra keyword để kiểm tra
+      // Nếu đã có ảnh thì thôi
+      if (container.querySelector('img')) return;
+
+      // Nếu đã cache thì dùng lại
+      if (imageCache.has(keyword)) {
+        insertImage(imageCache.get(keyword), container);
+        return;
+      }
+
+      // Tránh gọi trùng khi đang loading
+      if (container.dataset.loading === 'true') return;
+      container.dataset.loading = 'true';
+
+      try {
+        const resp = await fetch(
+          `https://pixabay.com/api/?key=51268254-554135d72f1d226beca834413&q=${encodeURIComponent(keyword)}&image_type=photo&category=technology`
+        );
+        const data = await resp.json();
+        if (data.hits && data.hits.length > 0) {
+          // Có thể chọn ảnh khớp tags hơn, nếu không thì lấy ảnh đầu tiên
+          const hit = data.hits.find(h => h.tags.toLowerCase().includes(keyword.toLowerCase())) || data.hits[0];
+          const url = hit.webformatURL;
+          imageCache.set(keyword, url);
+          insertImage(url, container);
+        }
+      } finally {
+        container.dataset.loading = 'false';
+      }
+    }
+
+
+    // Khi mở popup, load ảnh cho các keyword
+    function openPopup(i) {
+      // Ẩn tất cả overlay + popup trước
+      document.querySelectorAll('.overlay').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.popup').forEach(el => el.style.display = 'none');
+
+      // Hiện overlay + popup mục tiêu
+      const overlay = document.getElementById("overlay-" + i);
+      const popup   = document.getElementById("popup-" + i);
+      if (overlay) overlay.style.display = "block";
+      if (popup)   popup.style.display   = "flex"; // giữ layout flex để cuộn nội dung
+
+      // Chỉ load ảnh nếu chưa có ảnh trong container
+      document.querySelectorAll(`#popup-${i} .img-container`).forEach(el => {
+        const key = el.dataset.key;
+        if (!el.querySelector('img')) {
+          loadImage(key, el);
+        }
+      });
+    }
+
+
+
+    function closePopup(i) {
+      // Ẩn overlay và popup
+      document.getElementById("overlay-" + i).style.display = "none";
+      document.getElementById("popup-" + i).style.display = "none";
+
+      // Nếu đang có audio phát thì dừng lại
+      if (currentSource) {
+        try { 
+          currentSource.stop(); 
+        } catch (e) {}
+        try { 
+          currentSource.disconnect(); 
+        } catch (e) {}
+        currentSource = null;
+      }
+
+      // Dừng toàn bộ audio trong AudioContext
+      if (audioCtx && audioCtx.state !== "closed") {
+        audioCtx.close().then(() => {
+          // Tạo lại audioCtx mới để dùng cho lần sau
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        });
+      }
+    }
+
+
+    // Fetch ảnh từ Pixabay (dùng cache nếu có sẵn)
+    async function fetchImage(keyword) {
+      if (!keyword) return null;
+
+      // Dùng cache nếu đã có (không khai báo lại imageCache)
+      if (window.imageCache && window.imageCache.has(keyword)) {
+        console.log("[IMG] Cache hit:", keyword);
+        return window.imageCache.get(keyword);
+      }
+
+      console.log("[IMG] Fetch:", keyword);
+      const resp = await fetch(
+        `https://pixabay.com/api/?key=51268254-554135d72f1d226beca834413&q=${encodeURIComponent(keyword)}&image_type=photo`
+      );
+      const data = await resp.json();
+      if (data.hits && data.hits.length > 0) {
+        const url = data.hits[0].webformatURL;
+        if (window.imageCache) window.imageCache.set(keyword, url);
+        console.log("[IMG] Cached:", keyword, url);
+        return url;
+      }
+      console.warn("[IMG] No result for:", keyword);
+      return null;
+    }
+
+    // Mở popup main
+    function openMainSlide() {
+      document.querySelectorAll('.overlay').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.popup').forEach(el => el.style.display = 'none');
+
+      document.getElementById("overlay-main").style.display = "block";
+      document.getElementById("popup-main").style.display = "flex";
+
+      const container = document.getElementById("slides-container");
+      container.innerHTML = `
+        <div class="caption">(Ảnh AI minh hoạ)</div>
+        <p style="text-align:center;color:#666;font-weight:bold;">
+          Hãy ấn nút <span style="color:#c00;">ĐỌC</span> để bắt đầu trình chiếu
+        </p>
+      `;
+    }
+
+
+    // Preload audio cho một đoạn text (giữ nguyên splitText hiện có)
+    async function preloadAudio(text) {
+      const chunks = splitText(text, 200);
+      console.log("[AUDIO] Chunks:", chunks.length);
+      const buffers = [];
+      for (const chunk of chunks) {
+        const buf = await fetchBuffer(chunk);
+        buffers.push(buf);
+      }
+      const totalLength = buffers.reduce((s, b) => s + b.length, 0);
+      const merged = audioCtx.createBuffer(buffers[0].numberOfChannels, totalLength, buffers[0].sampleRate);
+      let offset = 0;
+      buffers.forEach(b => {
+        for (let c = 0; c < b.numberOfChannels; c++) {
+          merged.getChannelData(c).set(b.getChannelData(c), offset);
+        }
+        offset += b.length;
+      });
+      console.log("[AUDIO] Duration:", merged.duration.toFixed(2), "s");
+      return merged;
+    }
+
+    const effects = [
+      "zoomInOut",
+      "zoomOutIn",
+      "slideLeftRight",
+      "slideRightLeft",
+      "slideTopBottom",
+      "slideBottomTop"
+    ];
+
+    const origins = [
+      "left top", "left center", "left 70%",
+      "right top", "right center", "right 30%",
+      "top left", "top center", "top 60%",
+      "bottom left", "bottom center", "bottom 40%"
+    ];
+
+    function startContinuousEffects(el, audioDuration) {
+      let elapsed = 0;
+      let remainingEffects = [...effects]; // copy mảng gốc
+      const effectDuration = 10; // thời gian mỗi hiệu ứng (giây)
+
+      function runEffect() {
+        // Nếu hết hiệu ứng thì reset lại mảng
+        if (remainingEffects.length === 0) {
+          remainingEffects = [...effects];
+        }
+
+        // Random trong mảng còn lại
+        const idx = Math.floor(Math.random() * remainingEffects.length);
+        const effect = remainingEffects[idx];
+        remainingEffects.splice(idx, 1); // loại bỏ hiệu ứng đã chọn
+
+        const origin = origins[Math.floor(Math.random() * origins.length)];
+
+        el.style.animationName = effect;
+        el.style.animationDuration = effectDuration + "s";
+        el.style.animationIterationCount = "1";
+        el.style.animationFillMode = "forwards";
+        el.style.transformOrigin = origin;
+
+        // Sau effectDuration giây thì đổi hiệu ứng mới nếu còn thời gian
+        setTimeout(() => {
+          elapsed += effectDuration;
+          if (elapsed < audioDuration) {
+            runEffect();
+          }
+        }, effectDuration * 1000);
+      }
+
+      runEffect();
+    }
+
+
+
+
+
+
+
+
+    // Đọc popup main: chỉ chuẩn bị, chưa chạy audio
+    async function readMain() {
+      // Dừng audio cũ nếu có
+      if (currentSource) {
+        try { currentSource.stop(); } catch(e) {}
+        try { currentSource.disconnect(); } catch(e) {}
+        currentSource = null;
+      }
+
+      const container = document.getElementById("slides-container");
+      container.innerHTML = '<div class="caption">(Ảnh AI minh hoạ)</div><p style="text-align:center;color:#06c;">Vui lòng ấn nút ▶️ Trình chiếu để chạy slide</p>';
+
+      // Gom nhánh
+      const branchPopups = Array.from(document.querySelectorAll('.popup[id^="popup-"]'))
+        .filter(el => el.id !== 'popup-main');
+
+      const branches = branchPopups.map(popup => {
+        const title = popup.querySelector('h3')?.textContent.trim() || '';
+        const subsTexts = Array.from(popup.querySelectorAll('li .sub-text')).map(el => el.textContent.trim());
+        const fullText = [title, ...subsTexts].filter(Boolean).join('. ');
+        const keys = Array.from(popup.querySelectorAll('li .img-container'))
+          .map(el => el.dataset.key)
+          .filter(Boolean);
+        const branchKey = keys.length ? keys[keys.length - 1] : null;
+        return { text: fullText, key: branchKey, title };
+      });
+
+      if (branches.length === 0) {
+        container.innerHTML = '<div class="caption">(Ảnh AI minh hoạ)</div><p style="text-align:center;color:#c00;">Không tìm thấy nhánh nào để đọc.</p>';
+        return;
+      }
+
+      // ✅ Preload ảnh branch 1 (chưa phát audio)
+      const first = branches[0];
+      const url = first.key ? await fetchImage(first.key) : null;
+
+      if (url) {
+        const slide = document.createElement("div");
+        slide.className = "slide";
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = "slide";
+        slide.appendChild(img);
+        container.appendChild(slide);
+      }
+
+      // Hiện nút Trình chiếu
+      const startBtn = document.getElementById("start-main-btn");
+      if (startBtn) {
+        startBtn.style.display = "inline-block";
+        startBtn.onclick = async () => {
+          startBtn.style.display = "none"; // ẩn nút sau khi bấm
+          if (audioCtx.state === "suspended") {
+            await audioCtx.resume();
+          }
+          playBranch(0, branches); // bắt đầu chạy slide + audio
+        };
+      }
+    }
+
+    // Hàm chạy tuần tự qua các nhánh
+    async function playBranch(index, branches) {
+      if (index >= branches.length) {
+        console.log("[MAIN] Hoàn tất trình chiếu popup chính");
+        return;
+      }
+
+      // Load audio + ảnh cho nhánh hiện tại
+      const audioBuf = await preloadAudio(branches[index].text);
+      const url = branches[index].key ? await fetchImage(branches[index].key) : null;
+
+      console.log("[PLAY] Nhánh:", branches[index].title, "| Img:", branches[index].key, "| Dur:", audioBuf.duration.toFixed(2), "s");
+
+      const container = document.getElementById("slides-container");
+      container.innerHTML = '<div class="caption">(Ảnh AI minh hoạ)</div>';
+
+      if (url) {
+        const slide = document.createElement("div");
+        slide.className = "slide";
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = "slide";
+        startContinuousEffects(img, audioBuf.duration);
+        slide.appendChild(img);
+        container.appendChild(slide);
+      } else {
+        const note = document.createElement("div");
+        note.style.textAlign = "center";
+        note.style.color = "#999";
+        note.textContent = "(Không có ảnh minh hoạ cho nhánh này)";
+        container.appendChild(note);
+      }
+
+      // Phát audio
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuf;
+      source.connect(audioCtx.destination);
+      currentSource = source;
+
+      if (audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      }
+
+      source.start();
+
+      // Khi audio kết thúc → phát nhánh tiếp theo
+      source.onended = () => {
+        try { source.disconnect(); } catch(e) {}
+        if (currentSource === source) currentSource = null;
+        playBranch(index + 1, branches);
+      };
+    }
+
+
+
+
+
+
+
+
+
+
+  </script>
+
+  <!-- Optional: SVG connectors for nicer lines -->
+  <script>
+    (function() {
+      // If you want true lines connecting center and branches, you can inject an SVG and draw lines dynamically.
+      // Skipped here to keep the template self-contained and simple.
+    })();
+  </script>
+</body>
+</html>
