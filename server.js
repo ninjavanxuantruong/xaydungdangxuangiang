@@ -12,9 +12,14 @@ dotenv.config();
 
 import admin from "firebase-admin";
 
+import axios from "axios";
+import * as cheerio from "cheerio";
 
+import Parser from "rss-parser";
+const parser = new Parser();
+import got from "got";
 
-
+import { XMLParser } from "fast-xml-parser";
 
 
 
@@ -75,25 +80,33 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+
+
 // ====== View engine ======
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 // ====== Static files ======
 app.use("/public", express.static(path.join(__dirname, "public")));
+app.use("/anh", express.static(path.join(__dirname, "anh")));
 
 // ====== Middleware ======
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 // ====== Session ======
+// ====== Session ======
 app.use(
   session({
     secret: "xuangiang-secret",
     resave: false,
     saveUninitialized: false,
+    cookie: {
+      maxAge: 15 * 24 * 60 * 60 * 1000 // 7 ngày (tính bằng mili giây)
+    }
   })
 );
+
 
 // ====== Health check ======
 app.get("/health", (req, res) => {
@@ -131,10 +144,16 @@ async function getFileList() {
       type: r.type || "Khác",
       summaryD: r.summaryD || "",
       summaryE: r.summaryE || "",
-      summaryF: r.summaryF || ""
+      summaryF: r.summaryF || "",
+      faceLink: r.faceLink || "",
+
+      // ✅ thêm để khớp với getPDFList
+      faceName: r.faceName || ""   // đã chuẩn hóa từ NguonTrang
     };
   });
 }
+
+
 
 
 function convertYouTubeLink(inputUrl) {
@@ -154,18 +173,149 @@ function convertYouTubeLink(inputUrl) {
     return null;
   }
 }
+// ===== Flipbook cache routes =====
+// Cache trong memory (sống theo vòng đời server)
+const inMemoryCache = {};
+
+app.get("/flipbook/:pdfId", requireLogin, async (req, res) => {
+  try {
+    const { pdfId } = req.params;
+    if (!pdfId || pdfId === "null") {
+      return res.status(400).json({ error: "pdfId không hợp lệ" });
+    }
+
+    const docRef = firestore.collection("translated_pdfs").doc(pdfId);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      return res.json({});
+    }
+
+    const data = doc.data();
+    // Lưu vào cache
+    inMemoryCache[pdfId] = data;
+
+    // Trả về toàn bộ dữ liệu của document
+    res.json(data);
+  } catch (err) {
+    console.error("GET /flipbook/:pdfId error:", err);
+    res.status(500).json({ error: "Không lấy được dữ liệu flipbook" });
+  }
+});
+
+// GET page: đọc từ cache, không gọi Firestore
+app.get("/flipbook/:pdfId/:page", requireLogin, (req, res) => {
+  const { pdfId, page } = req.params;
+  if (!pdfId || pdfId === "null") {
+    return res.status(400).json({ error: "pdfId không hợp lệ" });
+  }
+
+  const key = `page${page}`;
+  const cachedDoc = inMemoryCache[pdfId];
+
+  if (cachedDoc && cachedDoc[key]) {
+    return res.json(cachedDoc[key]);
+  }
+
+  res.json({ text: null });
+});
+
+// POST page: ghi vào Firestore và cập nhật cache
+app.post("/flipbook/:pdfId/:page", requireLogin, async (req, res) => {
+  try {
+    const { pdfId, page } = req.params;
+    const { text } = req.body;
+    if (!pdfId || pdfId === "null") {
+      return res.status(400).json({ error: "pdfId không hợp lệ" });
+    }
+
+    const key = `page${page}`;
+    const docRef = firestore.collection("translated_pdfs").doc(pdfId);
+
+    await docRef.set({ [key]: { text } }, { merge: true });
+
+    // Cập nhật cache
+    if (!inMemoryCache[pdfId]) inMemoryCache[pdfId] = {};
+    inMemoryCache[pdfId][key] = { text };
+
+    res.json({ status: "saved" });
+  } catch (err) {
+    console.error("POST /flipbook error:", err);
+    res.status(500).json({ error: "Không ghi được dữ liệu flipbook" });
+  }
+});
+
+// GET chunk: đọc từ cache
+app.get("/flipbook/:pdfId/:page/:chunkIdx", requireLogin, (req, res) => {
+  const { pdfId, page, chunkIdx } = req.params;
+  if (!pdfId || pdfId === "null") {
+    return res.status(400).json({ error: "pdfId không hợp lệ" });
+  }
+
+  const pageKey = `page${page}`;
+  const chunkKey = `chunk_${chunkIdx}`;
+  const cachedDoc = inMemoryCache[pdfId];
+
+  if (cachedDoc && cachedDoc[pageKey] && cachedDoc[pageKey][chunkKey]) {
+    return res.json(cachedDoc[pageKey][chunkKey]);
+  }
+
+  res.json({ text: null });
+});
+
+// POST chunk: ghi vào Firestore và cập nhật cache
+app.post("/flipbook/:pdfId/:page/:chunkIdx", requireLogin, async (req, res) => {
+  try {
+    const { pdfId, page, chunkIdx } = req.params;
+    const { text } = req.body;
+    if (!pdfId || pdfId === "null") {
+      return res.status(400).json({ error: "pdfId không hợp lệ" });
+    }
+
+    const pageKey = `page${page}`;
+    const chunkKey = `chunk_${chunkIdx}`;
+    const docRef = firestore.collection("translated_pdfs").doc(pdfId);
+
+    // Ghi vào Firestore
+    await docRef.set({ [pageKey]: { [chunkKey]: { text } } }, { merge: true });
+
+    // Cập nhật cache
+    if (!inMemoryCache[pdfId]) inMemoryCache[pdfId] = {};
+    if (!inMemoryCache[pdfId][pageKey]) inMemoryCache[pdfId][pageKey] = {};
+    inMemoryCache[pdfId][pageKey][chunkKey] = { text };
+
+    res.json({ status: "saved" });
+  } catch (err) {
+    console.error("POST /flipbook error:", err);
+    res.status(500).json({ error: "Không ghi được dữ liệu flipbook" });
+  }
+});
+
+
+
 
 // ====== Auth routes ======
 app.get("/login", async (req, res) => {
   try {
+    // 👉 Xoá session cũ nếu có
+    if (req.session.user) {
+      req.session.destroy(err => {
+        if (err) {
+          console.error("❌ Lỗi xoá session:", err);
+        }
+      });
+    }
+
     const users = await getUsers();
     const units = users.map(u => u.name).filter(Boolean);
+
     res.render("login", { error: null, units });
   } catch (err) {
     console.error("GET /login error:", err);
     res.render("login", { error: "Không tải được danh sách đơn vị", units: [] });
   }
 });
+
 
 
 
@@ -206,23 +356,177 @@ app.get("/logout", (req, res) => {
 });
 
 // ====== Dashboard (hiển thị danh sách type) ======
-// ====== Dashboard (hiển thị danh sách type + báo cáo) ======
+
 app.get("/", requireLogin, async (req, res) => {
   try {
+    console.log("🚀 Vào route / (dashboard)");
+
+    // ===== Ghi log truy cập theo tháng =====
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const month = today.slice(0, 7); // YYYY-MM
+    const unit = req.session.user.unit;
+
+    const docRef = firestore.collection("truycap").doc(month);
+    const docSnap = await docRef.get();
+    let data = docSnap.exists ? docSnap.data() : { month, users: {}, total: 0 };
+
+    if (unit === "Đảng viên") {
+      data.users[unit] = (data.users[unit] || 0) + 1;
+      data.total++;
+      await docRef.set(data);
+    } else {
+      if (req.session.user.lastAccessDate !== today) {
+        data.users[unit] = (data.users[unit] || 0) + 1;
+        data.total++;
+        await docRef.set(data);
+        req.session.user.lastAccessDate = today;
+      }
+    }
+
+    // ===== Phần dashboard =====
     const files = await getFileList();
+    console.log("📂 Tổng số files:", files.length);
+
     const types = [...new Set(files.map(f => f.type))];
-    const reports = await getReports();
+
+    // 👉 Lấy danh sách báo cáo từ Google Sheet (chỉ báo cáo còn tên)
+    const sheetReports = (await getReports()).filter(r => r.name && r.name.trim() !== "");
+    const sheetNames = sheetReports.map(r => normalizeReportName(r.name));
 
     let submissions = [];
     if (req.session?.user?.unit === "Ban XDĐ") {
       const snapshot = await firestore.collection("report_submissions").get();
-      submissions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      submissions = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        // 👉 Chỉ giữ lại những báo cáo có trong Google Sheet
+        .filter(s => sheetNames.includes(normalizeReportName(s.reportName)));
+      console.log("📝 Submissions sau khi lọc:", submissions.length);
     }
 
-    res.render("dashboard", { types, reports, submissions, user: req.session.user });
+    // Render dashboard với danh sách đã lọc
+    res.render("dashboard", {
+      types,
+      reports: sheetReports,   // chỉ báo cáo còn tên trên Google Sheet
+      submissions,             // chỉ submissions khớp với sheet
+      user: req.session.user,
+      posts: []
+    });
+
   } catch (err) {
-    console.error("Home error:", err);
+    console.error("❌ Home error:", err);
     res.status(500).send("Không tải được dashboard");
+  }
+});
+
+
+
+
+
+// xem link
+app.get("/xemlink", requireLogin, (req, res) => {
+  const url = req.query.url;
+  res.render("xemlink", { url });
+});
+
+// ===== News =====
+app.get("/news", requireLogin, async (req, res) => {
+  try {
+    console.log("🚀 Vào route /news");
+
+    const files = await getFileList();
+    console.log("📂 Tổng số files:", files.length);
+
+    const posts = [];
+
+    // Bước 1: RSS Xuân Giang cố định
+    try {
+      console.log("👉 Đọc RSS Xuân Giang");
+      const rssUrl = "https://cdn.feedcontrol.net/13673/24560-AB95kLXiGdUMo.xml";
+      const resp = await axios.get(rssUrl, { timeout: 15000 });
+      const parser = new XMLParser({ ignoreAttributes: false });
+      const rss = parser.parse(resp.data);
+      const items = rss.rss.channel.item || [];
+      if (items.length > 0) {
+        const it = items[0];
+        const post = {
+          title: it.title,
+          link: it.link,
+          date: it.pubDate,
+          image: "/anh/123.jpg",
+          name: "Trang thông tin điện tử Xuân Giang"  // ✅ luôn hiện cụm này
+        };
+        posts.push(post);
+        console.log("✅ Xuân Giang picked:", post);
+      }
+    } catch (err) {
+      console.error("❌ Xuân Giang RSS error:", err.message);
+    }
+
+    // Bước 2: xử lý các site khác
+    for (const f of files) {
+      if (!f.faceLink) continue;
+      console.log("🔎 Đang xử lý site:", f.faceLink);
+
+      let pickedPost = null;
+
+      try {
+        const resp = await axios.get(f.faceLink, { timeout: 15000 });
+        const $ = cheerio.load(resp.data);
+        const selectors = [
+          ".article-item",
+          ".news-item",
+          ".post-item",
+          ".list-article .item",
+          ".list-news .item",
+          "article"
+        ];
+        for (const sel of selectors) {
+          $(sel).each((i, el) => {
+            if (pickedPost) return;
+            const $el = $(el);
+            const $a = $el.find("a").first();
+            const title = ($a.attr("title") || $a.text() || $el.find("h2,h3").first().text()).trim();
+            const href = $a.attr("href");
+            const link = href ? new URL(href, f.faceLink).href : null;
+            let imgSrc = $el.find("img").attr("src") || $el.find("img").attr("data-src");
+            const imageUrl = imgSrc ? new URL(imgSrc, f.faceLink).href : null;
+            if (title && link) {
+              pickedPost = {
+                title,
+                link,
+                image: imageUrl || null,
+                name: f.faceName || ""  // ✅ thêm tên nguồn từ cột H
+              };
+            }
+          });
+          if (pickedPost) break;
+        }
+        if (pickedPost) {
+          console.log("✅ Site khác picked:", pickedPost);
+        }
+      } catch (err) {
+        console.error("❌ News crawl error:", f.faceLink, err.message);
+      }
+
+      // Fallback nếu không crawl được
+      if (!pickedPost) {
+        pickedPost = {
+          title: f.faceName || f.faceLink,
+          link: f.faceLink,
+          image: null,
+          name: f.faceName || ""
+        };
+        console.log("⚠️ Fallback dùng faceName:", pickedPost);
+      }
+
+      posts.push(pickedPost);
+    }
+
+    res.json(posts);
+
+  } catch (err) {
+    console.error("❌ News error:", err);
+    res.status(500).send("Không tải được tin bài");
   }
 });
 
@@ -464,9 +768,7 @@ app.get("/reports/results", requireLogin, async (req, res) => {
   }
 });
 
-// ====== Kết quả tổng hợp theo tên báo cáo ======
-// ====== Kết quả tổng hợp theo tên báo cáo ======
-// ====== Kết quả tổng hợp theo tên báo cáo ======
+
 // ====== Kết quả tổng hợp theo tên báo cáo ======
 app.get("/reports/results/:reportName", requireLogin, async (req, res) => {
   try {
@@ -478,8 +780,8 @@ app.get("/reports/results/:reportName", requireLogin, async (req, res) => {
     const rawName = decodeURIComponent(req.params.reportName);
     const reportName = normalizeReportName(rawName);
 
-    // Lấy danh sách báo cáo để tìm link Google Sheet
-    const reports = await getReports();
+    // 👉 Lấy danh sách báo cáo, lọc bỏ báo cáo không có tên hợp lệ
+    const reports = (await getReports()).filter(r => r.name && r.name.trim() !== "");
     const report = reports.find(r => normalizeReportName(r.name) === reportName);
     if (!report) return res.status(404).send("Không tìm thấy báo cáo");
 
@@ -540,6 +842,8 @@ app.get("/reports/results/:reportName", requireLogin, async (req, res) => {
   }
 });
 
+
+
 // ====== Điểm danh báo cáo ======
 // ====== Điểm danh báo cáo (chỉ Ban XDĐ) ======
 // ====== Điểm danh báo cáo ======
@@ -592,13 +896,18 @@ app.get("/reports/attendance", requireLogin, async (req, res) => {
 
 
 // ====== Dynamic report form ======
+// ====== Dynamic report form ======
 app.get("/reports/:name", requireLogin, async (req, res) => {
   try {
-    const reportName = req.params.name;
-    const reports = await getReports();
-    const report = reports.find(r => r.name === reportName);
+    const rawName = decodeURIComponent(req.params.name);
+    const reportName = normalizeReportName(rawName);
+
+    // 👉 Lấy danh sách báo cáo, lọc bỏ báo cáo không có tên hợp lệ
+    const reports = (await getReports()).filter(r => r.name && r.name.trim() !== "");
+    const report = reports.find(r => normalizeReportName(r.name) === reportName);
     if (!report) return res.status(404).send("Không tìm thấy báo cáo");
 
+    // Lấy danh sách cột (fields) từ Google Sheet
     const fields = await fetchSheetColumnsFromGoogleLink(report.url);
     if (!fields.length) {
       return res.status(400).send("Không đọc được cấu trúc báo cáo từ Google Sheet");
@@ -614,14 +923,23 @@ app.get("/reports/:name", requireLogin, async (req, res) => {
   }
 });
 
-// ====== Submit report (1 báo cáo = 1 document, trong data có cả tên người) ======
+
+
 // ====== Submit report (1 báo cáo = 1 document, trong data có cả tên người) ======
 // ====== Submit report (1 báo cáo = 1 document, trong data có cả tên người) ======
 app.post("/reports/:name", requireLogin, async (req, res) => {
   try {
     const unit = req.session?.user?.unit || "Unknown unit";
     const username = req.session?.user?.username || "Unknown user";
-    const reportName = normalizeReportName(req.params.name);
+    const rawName = decodeURIComponent(req.params.name);
+    const reportName = normalizeReportName(rawName);
+
+    // 👉 Lấy danh sách báo cáo, lọc bỏ báo cáo không có tên hợp lệ
+    const reports = (await getReports()).filter(r => r.name && r.name.trim() !== "");
+    const report = reports.find(r => normalizeReportName(r.name) === reportName);
+    if (!report) {
+      return res.status(404).send("Không tìm thấy báo cáo để nộp");
+    }
 
     // Data từ form động + thêm tên người
     const data = {
@@ -645,25 +963,48 @@ app.post("/reports/:name", requireLogin, async (req, res) => {
     }, { merge: true });
 
     // ✅ Sau khi lưu thành công: render lại form với status=success
-    const reports = await getReports();
-    const report = reports.find(r => normalizeReportName(r.name) === reportName);
-    const fields = report ? await fetchSheetColumnsFromGoogleLink(report.url) : [];
-
+    const fields = await fetchSheetColumnsFromGoogleLink(report.url);
     res.render("report_form", { reportName, fields, status: "success" });
 
   } catch (err) {
     console.error("POST /reports/:name error:", err);
 
-    // ❌ Nếu lỗi: render lại form với status=error
-    const reportName = normalizeReportName(req.params.name);
-    const reports = await getReports();
+    const rawName = decodeURIComponent(req.params.name);
+    const reportName = normalizeReportName(rawName);
+
+    // 👉 Lọc bỏ báo cáo không có tên hợp lệ
+    const reports = (await getReports()).filter(r => r.name && r.name.trim() !== "");
     const report = reports.find(r => normalizeReportName(r.name) === reportName);
     const fields = report ? await fetchSheetColumnsFromGoogleLink(report.url) : [];
 
+    // ❌ Nếu lỗi: render lại form với status=error
     res.render("report_form", { reportName, fields, status: "error" });
   }
 });
 
+// thống kê truy cập
+app.get("/stats", requireLogin, async (req, res) => {
+  try {
+    const snapshot = await firestore.collection("truycap").orderBy("month", "desc").get();
+    const stats = snapshot.docs.map(doc => doc.data());
+    res.render("stats", { stats });
+  } catch (err) {
+    console.error("❌ Stats error:", err);
+    res.status(500).send("Không tải được thống kê");
+  }
+});
+
+app.post("/stats/delete/:month", requireLogin, async (req, res) => {
+  try {
+    const month = req.params.month;
+    await firestore.collection("truycap").doc(month).delete();
+    console.log(`🗑️ Đã xoá thống kê tháng ${month}`);
+    res.redirect("/stats");
+  } catch (err) {
+    console.error("❌ Lỗi xoá thống kê:", err);
+    res.status(500).send("Không xoá được thống kê");
+  }
+});
 
 // ====== 404 ======
 app.use((req, res) => {
