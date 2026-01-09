@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= title %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="/public/style.css" />
+  <style>
+    body {
+      margin: 0;
+      font-family: "Roboto", Arial, sans-serif;
+      background: #fff;
+      padding: 20px;
+    }
+    header {
+      background: #cc0000;
+      color: #fff;
+      padding: 10px 20px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 20px;
+    }
+    .content {
+      max-width: 800px;
+      margin: 20px auto;
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 6px;
+    }
+    .content img {
+      max-width: 100%;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    .content p {
+      font-size: 16px;
+      line-height: 1.6;
+      white-space: pre-line; /* giữ xuống dòng từ FB */
+    }
+    .back-link {
+      display: inline-block;
+      margin-top: 20px;
+      text-decoration: none;
+      color: #fff;
+      background: #d50000;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .back-link:hover {
+      background: #a00000;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><%= title %></h1>
+  </header>
+
+  <div class="content">
+    <% if (image) { %>
+      <img src="<%= image %>" alt="Ảnh tin bài" />
+    <% } %>
+    <p><%= content %></p>
+    <a href="/news" class="back-link">← Quay lại danh sách tin bài</a>
+  </div>
+</body>
+</html>
