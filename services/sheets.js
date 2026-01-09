@@ -34,6 +34,9 @@ export async function getPDFList() {
   if (!url) return [];
   const records = await fetchSheet(url);
 
+  console.log("🔍 Sample record:", records[0]);
+  console.log("🔍 Keys:", Object.keys(records[0]));
+
   return records
     .map(r => ({
       type: r.type || r.Type || r.loai || "Khác",
@@ -41,10 +44,15 @@ export async function getPDFList() {
       url: r.url || r.URL || r.link || "",
       summaryD: r.summaryD || r.D || r.tomtat1 || "",
       summaryE: r.summaryE || r.E || r.tomtat2 || "",
-      summaryF: r.summaryF || r.F || r.tomtat3 || ""
+      summaryF: r.summaryF || r.F || r.tomtat3 || "",
+      faceLink: r.faceLink || r.G || "",
+      faceName: r.NguonTrang || ""   // ✅ lấy đúng cột H
     }))
-    .filter(item => item.url);
+    .filter(item => item.url || item.faceLink);
 }
+
+
+
 
 /**
  * Lấy danh sách user từ sheet
