@@ -1,1124 +1,1276 @@
-      <!DOCTYPE html>
-      <html lang="vi">
-      <head>
-        <meta charset="UTF-8" />
-        <title><%= name %></title>
-        <link rel="stylesheet" href="/public/style.css" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= name %></title>
+  <link rel="stylesheet" href="/public/style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
-        <style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+  <style>
 
-          #controlBar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            z-index: 999;
-            background: #fff;
-            padding: 8px 12px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-            justify-content: center;
+    #controlBar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 999;
+      background: #fff;
+      padding: 8px 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    main {
+      /* bỏ padding-top cố định, để JS set động */
+      padding-top: 0;
+    }
+
+
+
+
+
+    /* Reset & global */
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;           /* tránh tràn ngang */
+      background: #fff;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    /* Main takes full width to allow proper centering of children */
+    main {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 8px 12px;            /* đệm nhẹ để không sát mép ở mobile */
+    }
+
+    /* Core centering rule: every main block is centered via auto margins */
+    .page-container,
+    #chunkTimeline,
+    #textView {
+      width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+      box-sizing: border-box;
+    }
+
+    /* Desktop max-width: applied only when screen is wide enough */
+    @media (min-width: 768px) {
+      .page-container,
+      #chunkTimeline,
+      #textView {
+        max-width: 960px;           /* chỉnh 860–1100 tuỳ mắt; 960 là tiêu chuẩn dễ đọc */
+      }
+    }
+
+    /* Canvas container and responsive canvas */
+    .page-container {
+      position: relative;           /* anchor cho overlay */
+    }
+
+    #pdfCanvas {
+      display: block;               /* loại bỏ inline khoảng trắng */
+      width: 100%;
+      height: auto;                 /* giữ tỉ lệ */
+    }
+
+    /* Overlays aligned to canvas area */
+    #highlightOverlay,
+    #markerOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;         /* highlight không bắt sự kiện */
+      width: 100%;
+      height: 100%;
+    }
+
+    .highlight-box {
+      position: absolute;
+      background: rgba(255, 224, 102, 0.2);
+      border-radius: 2px;
+    }
+
+    .chunk-marker {
+      position: absolute;
+      pointer-events: auto;         /* marker có thể bấm */
+      z-index: 20;
+      color: red;
+      font-size: 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* Timeline centered and constrained */
+    #chunkTimeline {
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+      border: 1px solid #ccc;
+      background: #fafafa;
+      border-radius: 0;
+      overflow-x: auto;   /* cuộn ngang khi nhiều block */
+      max-height: 56px;
+      margin-top: 12px;   /* khoảng cách nhẹ với phần trên */
+    }
+
+    /* ❌ Bỏ hẳn đoạn sticky cho desktop */
+    @media (min-width: 768px) {
+      #chunkTimeline {
+        position: static; /* mặc định, không sticky */
+        top: auto;
+        z-index: auto;
+      }
+    }
+
+
+    .chunk-block {
+      flex: 0 0 auto;
+      min-width: 32px;
+      padding: 6px 10px;
+      background: #eee;
+      border-radius: 3px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 14px;
+      text-align: center;
+      border: 1px solid #ddd;
+    }
+    .chunk-block.active {
+      background: #ffd966;
+      border-color: #e6c441;
+    }
+
+    /* Easy reading mode view: centered and readable */
+    #textView {
+      display: none;
+      width: 100%;
+      margin: 0 auto;
+      min-height: 60vh;
+      box-sizing: border-box;
+      padding: 16px;
+      line-height: 1.6;
+      font-size: var(--readerFont, 18px);
+      background: #fff;
+      color: #222;
+      overflow-y: auto;
+
+      /* ✅ Thêm 2 dòng này */
+      text-align: justify;
+      hyphens: auto;
+    }
+    #loadingAlert {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%); /* căn giữa ngang dọc */
+      background: rgba(255, 255, 255, 0.95);
+      padding: 20px 30px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 1000;
+      text-align: center;
+    }
+
+
+
+    /* Highlight active chunk inside textView */
+    .chunk-span.active {
+      background: rgba(255, 224, 102, 0.6);
+      border-radius: 2px;
+    }
+
+    /* Hide canvas/overlays when reader mode is active */
+    .reader-active #pdfCanvas,
+    .reader-active #highlightOverlay,
+    .reader-active #markerOverlay {
+      display: none !important;
+    }
+
+    /* Optional: prevent the timeline from stretching too tall on mobile */
+    
+    .next-page-popup {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 10px 15px;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      font-size: 14px;
+      z-index: 1000;
+    }
+    .next-page-popup button {
+      margin: 0 5px;
+      padding: 5px 10px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+
+
+
+  </style>
+</head>
+<body>
+
+  <div id="loadingAlert" class="alert">
+    📄 Vui lòng chờ giây lát để tải tài liệu...
+  </div>
+
+  <main>
+    <div id="controlBar">
+      <button class="btn" id="prevBtn">⬅️ Trước</button>
+      <button class="btn" id="nextBtn">➡️ Sau</button>
+      <button class="btn primary" id="readBtn">🔊 Đọc trang</button>
+      <button class="btn" id="pauseBtn">⏸ Dừng</button>
+      <button class="btn" id="resumeBtn">▶️ Tiếp tục</button>
+      <span id="pageInfo" class="page-info"></span>
+      <button class="btn" id="readerToggleBtn">📰 Chế độ dễ đọc</button>
+      <button class="btn" id="zoomOutTextBtn"> Chữ to</button>
+      <button class="btn" id="zoomInTextBtn">Chữ nhỏ</button>
+      <button class="btn" id="speedDownBtn">Chậm</button>
+      <button class="btn" id="speedUpBtn">Nhanh</button>
+      <span id="speedInfo">Tốc độ: 1.0x</span>
+
+    </div>
+
+    
+
+    <div id="textView"></div>
+
+
+
+
+    <!-- Canvas + overlays -->
+    <div class="page-container">
+      <canvas id="pdfCanvas"></canvas>
+      <div id="highlightOverlay"></div>
+      <div id="markerOverlay"></div>
+      <div id="chunkTimeline"></div>
+    </div>
+
+
+  </main>
+  <script>
+    function adjustMainPadding() {
+      const bar = document.getElementById("controlBar");
+      const main = document.querySelector("main");
+      if (bar && main) {
+        main.style.paddingTop = bar.offsetHeight + "px";
+      }
+    }
+
+    window.addEventListener("load", adjustMainPadding);
+    window.addEventListener("resize", adjustMainPadding);
+  </script>
+
+  <script>
+    window.currentPdfId = "<%- name %>";   // gán lên window để toàn bộ JS dùng được
+    console.log("currentPdfId =", window.currentPdfId);
+  </script>
+
+
+
+
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const loadingAlert = document.getElementById('loadingAlert');
+    setTimeout(() => loadingAlert.style.display = 'none', 3000);
+
+    const pdfUrl = "<%= link %>";
+    const canvas = document.getElementById('pdfCanvas');
+    const ctx = canvas.getContext('2d');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const readBtn = document.getElementById('readBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resumeBtn = document.getElementById('resumeBtn');
+    const pageInfo = document.getElementById('pageInfo');
+    const highlightOverlay = document.getElementById('highlightOverlay');
+    const markerOverlay    = document.getElementById('markerOverlay');
+
+    const flipSound = new Audio("https://raw.githubusercontent.com/ninjavanxuantruong/xaydungdangxuangiang/main/flipcard-91468.mp3");
+    flipSound.volume = 0.6;
+    flipSound.load();
+
+    let audioCtx = null;
+    function unlockAudio() {
+      flipSound.play().then(() => {
+        flipSound.pause();
+        flipSound.currentTime = 0;
+      }).catch(()=>{});
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+      document.removeEventListener("touchstart", unlockAudio);
+      document.removeEventListener("click", unlockAudio);
+    }
+    document.addEventListener("touchstart", unlockAudio, { once: true });
+    document.addEventListener("click", unlockAudio, { once: true });
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    let pdfDoc = null;
+    let currentPage = 1;
+    let currentPdfId = null;   // 👉 thêm biến này
+
+
+    let playbackRate = 1.0;
+
+
+
+
+
+    // Quản lý timeout highlight
+    let activeTimeouts = [];
+    let activeSources = []; // thêm mảng này
+
+    function clearAllHighlightTimeouts() {
+      activeTimeouts.forEach(id => clearTimeout(id));
+      activeTimeouts = [];
+    }
+
+    function stopAudio() {
+      // ❌ không đóng audio context nữa
+      // chỉ dừng tất cả source đang chạy
+      activeSources.forEach(src => {
+        try { src.stop(); } catch(e) {}
+      });
+      activeSources = [];
+
+      // Clear timeout highlight
+      activeTimeouts.forEach(id => clearTimeout(id));
+      activeTimeouts = [];
+
+      // Xoá highlight cũ
+      highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
+
+      console.log("🧹 stopAudio cleaned up");
+    }
+
+    const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
+    loadingTask.promise.then(doc => {
+      pdfDoc = doc;
+      renderPage(currentPage);
+      updatePageInfo();
+    }).catch(err => {
+      console.error('PDF load error:', err);
+      alert('Không thể tải PDF. Vui lòng kiểm tra link.');
+    });
+
+
+    function updatePageInfo() {
+      if (!pdfDoc) return;
+      pageInfo.textContent = `Trang ${currentPage} / ${pdfDoc.numPages}`;
+    }
+
+    function resyncOverlayScale() {
+      const scaleX = canvas.clientWidth  / canvas.width;
+      const scaleY = canvas.clientHeight / canvas.height;
+
+      // Highlight cần scale theo kích thước hiển thị
+      highlightOverlay.style.transformOrigin = "top left";
+      highlightOverlay.style.transform = `scale(${scaleX}, ${scaleY})`;
+
+      // Marker KHÔNG scale (đã dùng toạ độ pixel thật)
+      markerOverlay.style.transform = "none";
+    }
+
+
+
+    async function renderPage(num) {
+      const page = await pdfDoc.getPage(num);
+      const scale = 1.5;
+      const viewport = page.getViewport({ scale });
+      const dpr = window.devicePixelRatio || 1;
+
+      canvas.width  = Math.floor(viewport.width  * dpr);
+      canvas.height = Math.floor(viewport.height * dpr);
+
+      const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
+      const renderContext = { canvasContext: ctx, viewport, transform };
+      await page.render(renderContext).promise;
+
+      highlightOverlay.style.width  = canvas.width + "px";
+      highlightOverlay.style.height = canvas.height + "px";
+      markerOverlay.style.width     = canvas.width + "px";
+      markerOverlay.style.height    = canvas.height + "px";
+
+      resyncOverlayScale();
+      highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
+    }
+
+    // (còn tiếp phần 2)
+    // ====== Hàm lấy text + highlight ======
+    function getItemsWithBoxes(textContent, viewport) {
+      const items = [];
+      for (const item of textContent.items) {
+        const text = (item.str || "").trim();
+        if (!text) continue;
+        const [vx, vy] = viewport.convertToViewportPoint(item.transform[4], item.transform[5]);
+        const fontSize = Math.abs(item.transform[0] || item.height || 12);
+        const height = fontSize;
+        const width = item.width ? item.width * viewport.scale : text.length * fontSize * 0.5;
+        items.push({ text, x: vx, y: vy - height, width, height });
+      }
+      return items;
+    }
+
+
+    // Tách dấu câu ra thành item riêng để dễ nhận diện
+    function normalizeItems(items) {
+      const result = [];
+      for (const it of items) {
+        // Tách theo các dấu câu phổ biến
+        const parts = it.text.split(/([.,;:!?])/);
+        for (const p of parts) {
+          if (p.trim() !== "") {
+            result.push({ ...it, text: p });
           }
-          main {
-            padding-top: 64px; /* hoặc đúng chiều cao của #controlBar */
+        }
+      }
+      return result;
+    }
+    // Hàm load toàn bộ dữ liệu PDF từ Firestore về sessionStorage
+    async function loadPdfData(pdfId) {
+      const docRef = firestore.collection("translated_pdfs").doc(pdfId);
+      const docSnap = await docRef.get();
+      if (docSnap.exists) {
+        const data = docSnap.data();
+        // Lưu toàn bộ vào sessionStorage theo từng page/chunk
+        Object.keys(data).forEach(pageKey => {
+          const pageData = data[pageKey];
+          Object.keys(pageData).forEach(chunkKey => {
+            const text = pageData[chunkKey].text;
+            sessionStorage.setItem(chunkKey, text);
+          });
+        });
+        console.log("📦 Loaded all pages from Firestore into sessionStorage");
+      }
+    }
+
+
+
+
+    // Hàm gọi API normalize, đảm bảo cache theo từng pdfId
+    // Gọi API để load toàn bộ document một lần
+    async function loadDocument(pdfId) {
+      const encodedId = encodeURIComponent(pdfId);
+      const res = await fetch(`/flipbook/${encodedId}`);
+      const data = await res.json();
+      // Cache toàn bộ document vào sessionStorage
+      sessionStorage.setItem(pdfId, JSON.stringify(data));
+      return data;
+    }
+
+    // Lấy chunk từ cache đã lưu
+    function getChunkFromCache(pdfId, page, chunkIdx) {
+      const docData = JSON.parse(sessionStorage.getItem(pdfId) || "{}");
+      const chunk = docData[`page${page}`]?.[`chunk_${chunkIdx}`];
+      if (!chunk) return null;
+      // Luôn trả về chuỗi text
+      return typeof chunk === "string" ? chunk : chunk.text || null;
+    }
+    async function normalizeText(rawText, pageNum, chunkIdx) {
+      try {
+        const pdfId = window.currentPdfId;
+        if (!pdfId) {
+          console.error("❌ pdfId is missing!");
+          return rawText;
+        }
+
+        // 1. Thử lấy chunk từ cache
+        let chunk = getChunkFromCache(pdfId, pageNum, chunkIdx);
+        if (chunk) {
+          console.log("📦 Cache hit:", pdfId, pageNum, chunkIdx);
+          return chunk;
+        }
+
+        // 2. Nếu chưa có cache → load toàn bộ document một lần
+        const docData = await loadDocument(pdfId);
+
+        // ✅ Chỉ lấy đúng dữ liệu của pageNum hiện tại
+        const pageData = docData[`page${pageNum}`];
+        if (pageData) {
+          chunk = pageData[`chunk_${chunkIdx}`];
+          if (chunk) {
+            return typeof chunk === "string" ? chunk : chunk.text || rawText;
+          }
+        }
+
+
+        // 3. Nếu server chưa có thì normalize local rồi POST
+        const res2 = await fetch("/api/normalize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: rawText })
+        });
+        const data2 = await res2.json();
+        const out = data2.normalized || rawText;
+
+        // 4. Gửi lên server để lưu
+        const encodedId = encodeURIComponent(pdfId);
+        await fetch(`/flipbook/${encodedId}/${pageNum}/${chunkIdx}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: out })
+        });
+
+        return out;
+      } catch (err) {
+        console.error("❌ Normalize API error:", err);
+        return rawText;
+      }
+    }
+
+
+
+
+
+
+
+    // Viết lại buildItemChunks
+    async function buildItemChunks(items, maxCharsPerChunk = 200, pageNum = currentPage) {
+      const chunks = [];
+      let startIdx = 0;
+
+      const isPunctuationEnd = (text) => {
+        const t = text.trim();
+        return [".", ",", ";", ":", "!", "?"].includes(t) ||
+               [".", ",", ";", ":", "!", "?"].some(p => t.endsWith(p)) ||
+               t.includes("\n");
+      };
+
+      while (startIdx < items.length) {
+        let accLen = 0;
+        let endIdx = startIdx - 1;
+        let lastPunctIdx = -1;
+
+        for (let i = startIdx; i < items.length; i++) {
+          const word = items[i].text;
+          const addLen = word.length + (i > startIdx ? 1 : 0);
+          if (accLen + addLen > maxCharsPerChunk) break;
+
+          accLen += addLen;
+          endIdx = i;
+          if (isPunctuationEnd(word)) lastPunctIdx = i;
+        }
+
+        if (lastPunctIdx >= startIdx) endIdx = lastPunctIdx;
+        if (endIdx < startIdx) endIdx = startIdx;
+
+        const textForHighlight = items.slice(startIdx, endIdx + 1).map(it => it.text).join(" ");
+        const textForTTS = items.slice(startIdx, endIdx + 1).map(it => it.text).join(" ");
+
+        // 👉 Gọi normalizeText với cache theo trang + chunk
+        const normalizedHighlight = await normalizeText(textForHighlight, pageNum, chunks.length);
+        const normalizedTTS = await normalizeText(textForTTS, pageNum, chunks.length);
+
+        chunks.push({
+          start: startIdx,
+          end: endIdx,
+          text: normalizedHighlight,
+          tts: normalizedTTS
+        });
+
+        startIdx = endIdx + 1;
+      }
+
+      return chunks;
+    }
+
+
+
+
+
+
+
+
+    function drawChunkOverlayByItems(chunk, items, overlay) {
+      // Xoá mọi highlight cũ để luôn chỉ còn 1 lớp
+      overlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
+      if (!chunk) return;
+
+      // Dùng pixel thật của canvas để khớp với viewport đã render
+      const dpr = window.devicePixelRatio || 1;
+
+      for (let i = chunk.start; i <= chunk.end; i++) {
+        const it = items[i];
+        if (!it) continue;
+
+        const box = document.createElement("div");
+        box.className = "highlight-box";
+
+        // Nhân với dpr để khớp vị trí canvas
+        box.style.left   = (it.x     * dpr) + "px";
+        box.style.top    = (it.y     * dpr) + "px";
+        box.style.width  = (it.width * dpr) + "px";
+        box.style.height = (it.height* dpr) + "px";
+
+        overlay.appendChild(box);
+      }
+    }
+
+
+    // ====== Render timeline số đoạn (thay marker) ======
+    function renderChunkTimeline(chunks, items) {
+      const timeline = document.getElementById("chunkTimeline");
+      timeline.innerHTML = "";
+
+      chunks.forEach((chunk, i) => {
+        const block = document.createElement("div");
+        block.className = "chunk-block";
+        block.textContent = i + 1; // hiển thị số thứ tự 1..N
+
+        block.addEventListener("click", () => {
+          // dừng audio hiện tại
+          stopAudio();
+
+          // reset trạng thái active
+          timeline.querySelectorAll(".chunk-block").forEach(el => el.classList.remove("active"));
+          block.classList.add("active");
+
+          console.log("⏩ Tua tới chunk index", i);
+
+          // gọi lại readCurrentPage với startIndex = i
+          // để đọc từ chunk i, và vẫn giữ logic popup khi hết chunk cuối
+          readCurrentPage(i);
+        });
+
+        timeline.appendChild(block);
+      });
+    }
+
+
+
+
+    function setActiveChunkBlock(index) {
+      const blocks = document.querySelectorAll("#chunkTimeline .chunk-block");
+      blocks.forEach(el => el.classList.remove("active"));
+      if (blocks[index]) blocks[index].classList.add("active");
+    }
+
+    // ====== Reader Mode ======
+    // ====== Reader Mode ======
+    async function showTextView(pageNum, chunks, items) {
+      const textView = document.getElementById("textView");
+      textView.innerHTML = "";
+
+      chunks.forEach((chunk, i) => {
+        const span = document.createElement("span");
+        span.className = "chunk-span";
+        span.dataset.idx = i;
+
+        // 👉 Dùng text đã chuẩn hóa từ chunk.tts
+        span.textContent = chunk.tts;
+
+        textView.appendChild(span);
+        textView.appendChild(document.createTextNode(" "));
+      });
+
+      textView.style.setProperty('--readerFont', readerFontPx + "px");
+      textView.style.display = "block";
+      document.body.classList.add("reader-active");
+    }
+
+
+    function setActiveChunkInTextView(i) {
+      document.querySelectorAll(".chunk-span").forEach(el => el.classList.remove("active"));
+      const el = document.querySelector(`.chunk-span[data-idx="${i}"]`);
+      if (el) el.classList.add("active");
+    }
+
+
+
+
+
+    // Biến toàn cục để đồng bộ giữa readCurrentPage và timeline
+    // Biến toàn cục để timeline dùng lại dữ liệu hiện tại
+    let currentChunks = [];
+    let currentItems = [];
+    
+    
+
+    async function readCurrentPage(startIndex = 0) {
+      if (!pdfDoc) return;
+      stopAudio();
+
+      const page = await pdfDoc.getPage(currentPage);
+      const scale = 1.5;
+      const viewport = page.getViewport({ scale });
+      const textContent = await page.getTextContent();
+
+      let items = getItemsWithBoxes(textContent, viewport);
+      if (!items.length) {
+        alert('Trang này không có văn bản (có thể là ảnh scan).');
+        return;
+      }
+
+      items = normalizeItems(items);
+      const chunks = await buildItemChunks(items, 200);
+
+      // normalize từng chunk và cache
+      for (let i = 0; i < chunks.length; i++) {
+        chunks[i].text = await normalizeText(chunks[i].text, currentPage, i);
+      }
+
+      // gán vào biến toàn cục để timeline dùng
+      currentChunks = chunks;
+      currentItems = items;
+
+      // render timeline (hàm này chỉ vẽ UI và gọi readCurrentPage(i) khi tua)
+      renderChunkTimeline(currentChunks, currentItems);
+
+      //audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      let stopRequested = false;
+      let currentSource = null;
+      let bufferQueue = [];
+
+      async function fetchBuffer(snippet) {
+        try {
+          const url = `/tts?q=${encodeURIComponent(snippet)}`;
+          const resp = await fetch(url);
+
+          if (!resp.ok) throw new Error("Google TTS failed");
+
+          const arrayBuffer = await resp.arrayBuffer();
+          return await audioCtx.decodeAudioData(arrayBuffer);
+        } catch (err) {
+          console.warn("Google TTS lỗi, fallback sang speechSynthesis:", err);
+
+          // Fallback: dùng giọng đọc của trình duyệt
+          if ("speechSynthesis" in window) {
+            const utter = new SpeechSynthesisUtterance(snippet);
+            utter.lang = "vi-VN";          // tiếng Việt
+            utter.rate = playbackRate;     // tốc độ đọc
+            speechSynthesis.speak(utter);
+          } else {
+            alert("Trình duyệt không hỗ trợ giọng đọc dự phòng.");
           }
 
+          // Trả về null để báo cho caller biết không có buffer
+          return null;
+        }
+      }
 
 
-          /* Reset & global */
-          html, body {
-            margin: 0;
-            padding: 0;
-            overflow-x: hidden;           /* tránh tràn ngang */
-            background: #fff;
-          }
+      async function prefillQueue(i, count = 3) {
+        for (let j = 0; j < count && i + j < currentChunks.length; j++) {
+          bufferQueue.push(await fetchBuffer(currentChunks[i + j].text));
+        }
+      }
 
-          body {
-            font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
-          }
+        async function autoNextPage() {
+          console.log("⏩ Đã đọc xong chunk cuối của trang", currentPage);
 
-          /* Main takes full width to allow proper centering of children */
-          main {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            padding: 8px 12px;            /* đệm nhẹ để không sát mép ở mobile */
-          }
+          // sang trang ngay
+          document.getElementById("nextBtn").click();
 
-          /* Core centering rule: every main block is centered via auto margins */
-          .page-container,
-          #chunkTimeline,
-          #textView {
-            width: 100%;
-            margin-left: auto;
-            margin-right: auto;
-            box-sizing: border-box;
-          }
+          // KHÔNG gọi audioCtx.resume() ở đây → iOS sẽ không tự đọc
+          // Android vẫn đọc tiếp vì Chrome cho phép auto-play
 
-          /* Desktop max-width: applied only when screen is wide enough */
-          @media (min-width: 768px) {
-            .page-container,
-            #chunkTimeline,
-            #textView {
-              max-width: 960px;           /* chỉnh 860–1100 tuỳ mắt; 960 là tiêu chuẩn dễ đọc */
-            }
-          }
-
-          /* Canvas container and responsive canvas */
-          .page-container {
-            position: relative;           /* anchor cho overlay */
-          }
-
-          #pdfCanvas {
-            display: block;               /* loại bỏ inline khoảng trắng */
-            width: 100%;
-            height: auto;                 /* giữ tỉ lệ */
-          }
-
-          /* Overlays aligned to canvas area */
-          #highlightOverlay,
-          #markerOverlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            pointer-events: none;         /* highlight không bắt sự kiện */
-            width: 100%;
-            height: 100%;
-          }
-
-          .highlight-box {
-            position: absolute;
-            background: rgba(255, 224, 102, 0.2);
-            border-radius: 2px;
-          }
-
-          .chunk-marker {
-            position: absolute;
-            pointer-events: auto;         /* marker có thể bấm */
-            z-index: 20;
-            color: red;
-            font-size: 14px;
-            cursor: pointer;
-            user-select: none;
-          }
-
-          /* Timeline centered and constrained */
-          #chunkTimeline {
-            display: flex;
-            gap: 6px;
-            padding: 6px;
-            border: 1px solid #ccc;
-            background: #fafafa;
-            border-radius: 0;
-            overflow-x: auto;             /* cuộn ngang khi nhiều block */
-          }
-
-          .chunk-block {
-            flex: 0 0 auto;
-            min-width: 32px;
-            padding: 6px 10px;
-            background: #eee;
-            border-radius: 3px;
-            cursor: pointer;
-            user-select: none;
-            font-size: 14px;
-            text-align: center;
-            border: 1px solid #ddd;
-          }
-          .chunk-block.active {
-            background: #ffd966;
-            border-color: #e6c441;
-          }
-
-          /* Easy reading mode view: centered and readable */
-          #textView {
-            display: none;
-            width: 100%;
-            margin: 0 auto;
-            min-height: 60vh;
-            box-sizing: border-box;
-            padding: 16px;
-            line-height: 1.6;
-            font-size: var(--readerFont, 18px);
-            background: #fff;
-            color: #222;
-            overflow-y: auto;
-
-            /* ✅ Thêm 2 dòng này */
-            text-align: justify;
-            hyphens: auto;
-          }
-          #loadingAlert {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%); /* căn giữa ngang dọc */
-            background: rgba(255, 255, 255, 0.95);
-            padding: 20px 30px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            color: #333;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            z-index: 1000;
-            text-align: center;
-          }
+          // load trang mới sau 300ms
+          setTimeout(() => {
+            readCurrentPage(0);
+          }, 300);
+        }
 
 
-
-          /* Highlight active chunk inside textView */
-          .chunk-span.active {
-            background: rgba(255, 224, 102, 0.6);
-            border-radius: 2px;
-          }
-
-          /* Hide canvas/overlays when reader mode is active */
-          .reader-active #pdfCanvas,
-          .reader-active #highlightOverlay,
-          .reader-active #markerOverlay {
-            display: none !important;
-          }
-
-          /* Optional: prevent the timeline from stretching too tall on mobile */
-          #chunkTimeline {
-            max-height: 56px;
-            margin-top: 96px;
-          }
-
-          /* Optional: sticky timeline when scrolling long text in reader mode */
-          @media (min-width: 768px) {
-            #chunkTimeline {
-              position: sticky;
-              top: 0;
-              z-index: 50;
-            }
-          }
-
-
-
-        </style>
-      </head>
-      <body>
-
-        <div id="loadingAlert" class="alert">
-          📄 Vui lòng chờ giây lát để tải tài liệu...
-        </div>
-
-        <main>
-          <div id="controlBar">
-            <button class="btn" id="prevBtn">⬅️ Trước</button>
-            <button class="btn" id="nextBtn">➡️ Sau</button>
-            <button class="btn primary" id="readBtn">🔊 Đọc trang</button>
-            <button class="btn" id="pauseBtn">⏸ Dừng</button>
-            <button class="btn" id="resumeBtn">▶️ Tiếp tục</button>
-            <span id="pageInfo" class="page-info"></span>
-            <button class="btn" id="readerToggleBtn">📰 Chế độ dễ đọc</button>
-            <button class="btn" id="zoomOutTextBtn"> Chữ to</button>
-            <button class="btn" id="zoomInTextBtn">Chữ nhỏ</button>
-            <button class="btn" id="speedDownBtn">Chậm</button>
-            <button class="btn" id="speedUpBtn">Nhanh</button>
-            <span id="speedInfo">Tốc độ: 1.0x</span>
-
-          </div>
-
-          <div id="chunkTimeline"></div>
         
-          <div id="textView"></div>
-
-   
-
-
-          <!-- Canvas + overlays -->
-          <div class="page-container">
-            <canvas id="pdfCanvas"></canvas>
-            <div id="highlightOverlay"></div>
-            <div id="markerOverlay"></div>
-          </div>
-
-          
-        </main>
-        <script>
-          window.currentPdfId = "<%- name %>";   // gán lên window để toàn bộ JS dùng được
-          console.log("currentPdfId =", window.currentPdfId);
-        </script>
 
 
 
 
-        <script>
-        document.addEventListener('DOMContentLoaded', () => {
-          const loadingAlert = document.getElementById('loadingAlert');
-          setTimeout(() => loadingAlert.style.display = 'none', 3000);
 
-          const pdfUrl = "<%= link %>";
-          const canvas = document.getElementById('pdfCanvas');
-          const ctx = canvas.getContext('2d');
-          const prevBtn = document.getElementById('prevBtn');
-          const nextBtn = document.getElementById('nextBtn');
-          const readBtn = document.getElementById('readBtn');
-          const pauseBtn = document.getElementById('pauseBtn');
-          const resumeBtn = document.getElementById('resumeBtn');
-          const pageInfo = document.getElementById('pageInfo');
-          const highlightOverlay = document.getElementById('highlightOverlay');
-          const markerOverlay    = document.getElementById('markerOverlay');
 
-          const flipSound = new Audio("https://raw.githubusercontent.com/ninjavanxuantruong/xaydungdangxuangiang/main/flipcard-91468.mp3");
-          flipSound.volume = 0.6;
-          flipSound.load();
+      async function playOne(i) {
+        if (stopRequested || i >= currentChunks.length) return;
 
-          let audioCtx = null;
-          function unlockAudio() {
-            flipSound.play().then(() => {
-              flipSound.pause();
-              flipSound.currentTime = 0;
-            }).catch(()=>{});
-            if (!audioCtx) {
-              audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (bufferQueue.length === 0) {
+          bufferQueue.push(await fetchBuffer(currentChunks[i].text));
+        }
+        const buffer = bufferQueue.shift();
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.playbackRate.value = playbackRate;
+        source.connect(audioCtx.destination);
+
+        if (readerMode) {
+          setActiveChunkInTextView(i);
+        } else {
+          drawChunkOverlayByItems(currentChunks[i], currentItems, highlightOverlay);
+          setActiveChunkBlock(i);
+        }
+
+        source.onended = async () => {
+          console.log("⏹ onended chunk", i);
+
+          // Nếu đây là chunk cuối cùng → hiện popup
+          // Nếu đây là chunk cuối cùng → tự sang trang
+          if (i === currentChunks.length - 1) {
+            console.log("✅ Hết chunk cuối cùng của trang", currentPage);
+            autoNextPage();
+            return;
+          }
+
+
+          if (!stopRequested) {
+            if (i + 3 < currentChunks.length) {
+              fetchBuffer(currentChunks[i + 3].text).then(buf => bufferQueue.push(buf));
             }
-            if (audioCtx.state === "suspended") {
-              audioCtx.resume();
+            console.log("➡ gọi playOne cho index", i + 1);
+            await playOne(i + 1);
+          }
+        };
+
+        source.start();
+        currentSource = source;
+      }
+
+      await prefillQueue(startIndex, 3);
+      await playOne(startIndex);
+
+      stopAudio = function() {
+        stopRequested = true;
+        bufferQueue = [];
+        if (currentSource) {
+          try { currentSource.stop(); } catch(e) {}
+          currentSource = null;
+        }
+        
+        highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
+        console.log("🧹 stopAudio cleaned up");
+      }
+    }
+
+
+    
+
+
+
+
+    
+
+    async function renderTextView(pageNum) {
+      const page = await pdfDoc.getPage(pageNum);
+      const scale = 1.5;
+      const viewport = page.getViewport({ scale });
+      const textContent = await page.getTextContent();
+
+      let items = getItemsWithBoxes(textContent, viewport);
+      items = normalizeItems(items);
+      const chunks = await buildItemChunks(items, 200);
+
+      for (let i = 0; i < chunks.length; i++) {
+        chunks[i].text = await normalizeText(chunks[i].text, pageNum, i);
+      }
+
+      const textView = document.getElementById("textView");
+      textView.innerHTML = "";
+      chunks.forEach((chunk, i) => {
+        const span = document.createElement("span");
+        span.className = "chunk-span";
+        span.dataset.idx = i;
+        span.textContent = chunk.text;
+        textView.appendChild(span);
+        textView.appendChild(document.createTextNode(" "));
+      });
+    }
+
+
+
+
+
+
+
+    // ====== Render marker ở lề ======
+    function renderChunkMarkers(chunks, items) {
+      markerOverlay.innerHTML = "";
+      const dpr = window.devicePixelRatio || 1;
+
+      const OFFSET_LEFT = -35;   // đẩy ra ngoài lề trái
+      const ICON_SIZE   = 28;    // kích thước vùng chạm
+
+      chunks.forEach((chunk, i) => {
+        const firstIt = items[chunk.start];
+        if (!firstIt) return;
+
+        const marker = document.createElement("div");
+        marker.className = "chunk-marker";
+        marker.textContent = "▶";
+
+        // Lấy toạ độ item đầu tiên
+        const leftPx = (firstIt.x + OFFSET_LEFT) * dpr;
+        const topPx  = (firstIt.y + firstIt.height / 2) * dpr;
+
+        marker.style.left = leftPx + "px";
+        marker.style.top  = (topPx - ICON_SIZE / 2) + "px";
+
+        marker.style.width = ICON_SIZE + "px";
+        marker.style.height = ICON_SIZE + "px";
+        marker.style.lineHeight = ICON_SIZE + "px";
+        marker.style.fontSize = "22px";
+
+        marker.addEventListener("click", () => {
+          playChunkFromIndex(i, chunks, items);
+        });
+
+        markerOverlay.appendChild(marker);
+      });
+    }
+
+
+
+
+    // ====== Đọc từ đoạn bất kỳ ======
+    async function playChunkFromIndex(startIndex, chunks, items) {
+      stopAudio();
+
+      //audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      let stopRequested = false;
+      let currentSource = null;
+      let bufferQueue = [];
+
+      async function fetchBuffer(snippet) {
+        try {
+          const url = `/tts?q=${encodeURIComponent(snippet)}`;
+          const resp = await fetch(url);
+
+          if (!resp.ok) throw new Error("Google TTS failed");
+
+          const arrayBuffer = await resp.arrayBuffer();
+          return await audioCtx.decodeAudioData(arrayBuffer);
+        } catch (err) {
+          console.warn("Google TTS lỗi, fallback sang speechSynthesis:", err);
+
+          // Fallback: dùng giọng đọc của trình duyệt
+          if ("speechSynthesis" in window) {
+            const utter = new SpeechSynthesisUtterance(snippet);
+            utter.lang = "vi-VN";          // tiếng Việt
+            utter.rate = playbackRate;     // tốc độ đọc
+            speechSynthesis.speak(utter);
+          } else {
+            alert("Trình duyệt không hỗ trợ giọng đọc dự phòng.");
+          }
+
+          // Trả về null để báo cho caller biết không có buffer
+          return null;
+        }
+      }
+
+
+      async function prefillQueue(startIndex, count = 3) {
+        for (let j = 0; j < count && startIndex + j < chunks.length; j++) {
+          bufferQueue.push(await fetchBuffer(chunks[startIndex + j].text));
+        }
+      }
+
+      async function playOne(i) {
+        if (stopRequested || i >= chunks.length) return;
+
+        if (bufferQueue.length === 0) {
+          bufferQueue.push(await fetchBuffer(chunks[i].text));
+        }
+        const buffer = bufferQueue.shift();
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.playbackRate.value = playbackRate;
+        source.connect(audioCtx.destination);
+
+        if (readerMode) {
+          setActiveChunkInTextView(i);
+        } else {
+          drawChunkOverlayByItems(chunks[i], items, highlightOverlay);
+          setActiveChunkBlock(i);
+        }
+
+
+        source.onended = () => {
+          if (!stopRequested) {
+            if (i + 3 < chunks.length) {
+              fetchBuffer(chunks[i + 3].text).then(buf => bufferQueue.push(buf));
             }
-            document.removeEventListener("touchstart", unlockAudio);
-            document.removeEventListener("click", unlockAudio);
+            playOne(i + 1);
           }
-          document.addEventListener("touchstart", unlockAudio, { once: true });
-          document.addEventListener("click", unlockAudio, { once: true });
+        };
 
-          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        source.start();
+        currentSource = source;
+      }
 
-          let pdfDoc = null;
-          let currentPage = 1;
-          let currentPdfId = null;   // 👉 thêm biến này
-          
-          
-          let playbackRate = 1.0;
-         
+      await prefillQueue(startIndex, 3);
+      playOne(startIndex);
 
-         
-
-
-          // Quản lý timeout highlight
-          let activeTimeouts = [];
-          let activeSources = []; // thêm mảng này
-
-          function clearAllHighlightTimeouts() {
-            activeTimeouts.forEach(id => clearTimeout(id));
-            activeTimeouts = [];
-          }
-
-          function stopAudio() {
-            // Dừng audio context
-            if (audioCtx) {
-              try { audioCtx.close(); } catch (e) { console.warn("AudioCtx close error:", e); }
-              audioCtx = null;
-            }
-
-            // Dừng tất cả source đang chạy
-            activeSources.forEach(src => {
-              try { src.stop(); } catch(e) {}
-            });
-            activeSources = [];
-
-            // Clear timeout highlight
-            activeTimeouts.forEach(id => clearTimeout(id));
-            activeTimeouts = [];
-
-            // Xoá highlight cũ
-            highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
-          }
-
-
-          const loadingTask = pdfjsLib.getDocument({ url: pdfUrl });
-          loadingTask.promise.then(doc => {
-            pdfDoc = doc;
-            renderPage(currentPage);
-            updatePageInfo();
-          }).catch(err => {
-            console.error('PDF load error:', err);
-            alert('Không thể tải PDF. Vui lòng kiểm tra link.');
-          });
-
-          function updatePageInfo() {
-            if (!pdfDoc) return;
-            pageInfo.textContent = `Trang ${currentPage} / ${pdfDoc.numPages}`;
-          }
-
-          function resyncOverlayScale() {
-            const scaleX = canvas.clientWidth  / canvas.width;
-            const scaleY = canvas.clientHeight / canvas.height;
-
-            // Highlight cần scale theo kích thước hiển thị
-            highlightOverlay.style.transformOrigin = "top left";
-            highlightOverlay.style.transform = `scale(${scaleX}, ${scaleY})`;
-
-            // Marker KHÔNG scale (đã dùng toạ độ pixel thật)
-            markerOverlay.style.transform = "none";
-          }
+      stopAudio = function() {
+        stopRequested = true;
+        bufferQueue = [];
+        if (currentSource) {
+          try { currentSource.stop(); } catch(e) {}
+          currentSource = null;
+        }
+        
+        highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
+      }
+    }
+    
 
 
 
-          async function renderPage(num) {
-            const page = await pdfDoc.getPage(num);
-            const scale = 1.5;
-            const viewport = page.getViewport({ scale });
-            const dpr = window.devicePixelRatio || 1;
+      // ====== Nút điều khiển ======
+    speedDownBtn.addEventListener('click', () => {
+      playbackRate = Math.max(0.5, playbackRate - 0.25); // không nhỏ hơn 0.5x
+      document.getElementById("speedInfo").textContent = `Tốc độ: ${playbackRate.toFixed(2)}x`;
+    });
 
-            canvas.width  = Math.floor(viewport.width  * dpr);
-            canvas.height = Math.floor(viewport.height * dpr);
+    speedUpBtn.addEventListener('click', () => {
+      playbackRate = Math.min(2.0, playbackRate + 0.25); // không lớn hơn 2x
+      document.getElementById("speedInfo").textContent = `Tốc độ: ${playbackRate.toFixed(2)}x`;
+    });
 
-            const transform = dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null;
-            const renderContext = { canvasContext: ctx, viewport, transform };
-            await page.render(renderContext).promise;
 
-            highlightOverlay.style.width  = canvas.width + "px";
-            highlightOverlay.style.height = canvas.height + "px";
-            markerOverlay.style.width     = canvas.width + "px";
-            markerOverlay.style.height    = canvas.height + "px";
+    prevBtn.addEventListener('click', async () => {
+      if (!pdfDoc || currentPage <= 1) return;
+      currentPage--;
+      stopAudio();
+      document.getElementById("chunkTimeline").innerHTML = "";
+      await renderPage(currentPage);
+      updatePageInfo();
+      flipSound.currentTime = 0; flipSound.play();
 
+      // 👉 nếu đang ở chế độ dễ đọc thì dựng lại text cho trang mới
+      if (readerMode) {
+        await renderTextView(currentPage);
+      }
+    });
+
+    nextBtn.addEventListener('click', async () => {
+      if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
+      currentPage++;
+      stopAudio();
+      document.getElementById("chunkTimeline").innerHTML = "";
+      await renderPage(currentPage);
+      updatePageInfo();
+      flipSound.currentTime = 0; flipSound.play();
+
+      // 👉 nếu đang ở chế độ dễ đọc thì dựng lại text cho trang mới
+      if (readerMode) {
+        await renderTextView(currentPage);
+      }
+    });
+
+    readBtn.addEventListener('click', async () => {
+      // đảm bảo audio context được mở
+      if (audioCtx && audioCtx.state === "suspended") {
+        await audioCtx.resume();
+      } else {
+        unlockAudio(); // nếu anh đã có hàm riêng
+      }
+
+      // bắt đầu đọc từ chunk đầu tiên
+      readCurrentPage(0);
+    });
+
+
+    pauseBtn.addEventListener('click', () => {
+      if (audioCtx && audioCtx.state === "running") audioCtx.suspend();
+    });
+
+    resumeBtn.addEventListener('click', () => {
+      if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    });
+
+
+      // Swipe (mobile)
+      let touchStartX = 0;
+      canvas.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+      });
+    canvas.addEventListener('touchend', async (e) => {
+      const touchEndX = e.changedTouches[0].screenX;
+      const deltaX = touchEndX - touchStartX;
+      if (Math.abs(deltaX) < 50) return;
+
+      if (deltaX < 0 && currentPage < pdfDoc.numPages) {
+        currentPage++;
+        stopAudio();
+        document.getElementById("chunkTimeline").innerHTML = "";
+        await renderPage(currentPage);
+        updatePageInfo();
+        flipSound.currentTime = 0; flipSound.play();
+
+        // 👉 thêm đoạn này
+        if (readerMode) {
+          readCurrentPage();
+        }
+      } else if (deltaX > 0 && currentPage > 1) {
+        currentPage--;
+        stopAudio();
+        document.getElementById("chunkTimeline").innerHTML = "";
+        await renderPage(currentPage);
+        updatePageInfo();
+        flipSound.currentTime = 0; flipSound.play();
+
+        // 👉 thêm đoạn này
+        if (readerMode) {
+          readCurrentPage();
+        }
+      }
+    });
+
+
+      // Mouse drag (desktop)
+      let startX = 0;
+      canvas.addEventListener('mousedown', (e) => {
+        startX = e.clientX;
+      });
+      canvas.addEventListener('mouseup', async (e) => {
+        const endX = e.clientX;
+        const deltaX = endX - startX;
+        if (Math.abs(deltaX) < 80) return;
+        if (deltaX < 0 && currentPage < pdfDoc.numPages) {
+          currentPage++;
+          stopAudio();
+          document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
+          await renderPage(currentPage);
+          updatePageInfo();
+          flipSound.currentTime = 0; flipSound.play();
+        } else if (deltaX > 0 && currentPage > 1) {
+          currentPage--;
+          stopAudio();
+          document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
+          await renderPage(currentPage);
+          updatePageInfo();
+          flipSound.currentTime = 0; flipSound.play();
+        }
+      });
+
+      // Khi xoay ngang/dọc
+      window.addEventListener('orientationchange', () => {
+        if (!pdfDoc) return;
+        renderPage(currentPage).then(() => {
+          updatePageInfo();
+          if (audioCtx && audioCtx.state === "running") {
             resyncOverlayScale();
-            highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
           }
-
-          // (còn tiếp phần 2)
-          // ====== Hàm lấy text + highlight ======
-          function getItemsWithBoxes(textContent, viewport) {
-            const items = [];
-            for (const item of textContent.items) {
-              const text = (item.str || "").trim();
-              if (!text) continue;
-              const [vx, vy] = viewport.convertToViewportPoint(item.transform[4], item.transform[5]);
-              const fontSize = Math.abs(item.transform[0] || item.height || 12);
-              const height = fontSize;
-              const width = item.width ? item.width * viewport.scale : text.length * fontSize * 0.5;
-              items.push({ text, x: vx, y: vy - height, width, height });
-            }
-            return items;
-          }
-
-
-          // Tách dấu câu ra thành item riêng để dễ nhận diện
-          function normalizeItems(items) {
-            const result = [];
-            for (const it of items) {
-              // Tách theo các dấu câu phổ biến
-              const parts = it.text.split(/([.,;:!?])/);
-              for (const p of parts) {
-                if (p.trim() !== "") {
-                  result.push({ ...it, text: p });
-                }
-              }
-            }
-            return result;
-          }
-          // Hàm load toàn bộ dữ liệu PDF từ Firestore về sessionStorage
-          async function loadPdfData(pdfId) {
-            const docRef = firestore.collection("translated_pdfs").doc(pdfId);
-            const docSnap = await docRef.get();
-            if (docSnap.exists) {
-              const data = docSnap.data();
-              // Lưu toàn bộ vào sessionStorage theo từng page/chunk
-              Object.keys(data).forEach(pageKey => {
-                const pageData = data[pageKey];
-                Object.keys(pageData).forEach(chunkKey => {
-                  const text = pageData[chunkKey].text;
-                  sessionStorage.setItem(chunkKey, text);
-                });
-              });
-              console.log("📦 Loaded all pages from Firestore into sessionStorage");
-            }
-          }
-
-          
-
-
-          // Hàm gọi API normalize, đảm bảo cache theo từng pdfId
-          // Gọi API để load toàn bộ document một lần
-          async function loadDocument(pdfId) {
-            const encodedId = encodeURIComponent(pdfId);
-            const res = await fetch(`/flipbook/${encodedId}`);
-            const data = await res.json();
-            // Cache toàn bộ document vào sessionStorage
-            sessionStorage.setItem(pdfId, JSON.stringify(data));
-            return data;
-          }
-
-          // Lấy chunk từ cache đã lưu
-          function getChunkFromCache(pdfId, page, chunkIdx) {
-            const docData = JSON.parse(sessionStorage.getItem(pdfId) || "{}");
-            const chunk = docData[`page${page}`]?.[`chunk_${chunkIdx}`];
-            if (!chunk) return null;
-            // Luôn trả về chuỗi text
-            return typeof chunk === "string" ? chunk : chunk.text || null;
-          }
-          async function normalizeText(rawText, pageNum, chunkIdx) {
-            try {
-              const pdfId = window.currentPdfId;
-              if (!pdfId) {
-                console.error("❌ pdfId is missing!");
-                return rawText;
-              }
-
-              // 1. Thử lấy chunk từ cache
-              let chunk = getChunkFromCache(pdfId, pageNum, chunkIdx);
-              if (chunk) {
-                console.log("📦 Cache hit:", pdfId, pageNum, chunkIdx);
-                return chunk;
-              }
-
-              // 2. Nếu chưa có cache → load toàn bộ document một lần
-              const docData = await loadDocument(pdfId);
-              chunk = docData[`page${pageNum}`]?.[`chunk_${chunkIdx}`];
-              if (chunk) {
-                return typeof chunk === "string" ? chunk : chunk.text || rawText;
-              }
-
-              // 3. Nếu server chưa có thì normalize local rồi POST
-              const res2 = await fetch("/api/normalize", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: rawText })
-              });
-              const data2 = await res2.json();
-              const out = data2.normalized || rawText;
-
-              // 4. Gửi lên server để lưu
-              const encodedId = encodeURIComponent(pdfId);
-              await fetch(`/flipbook/${encodedId}/${pageNum}/${chunkIdx}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: out })
-              });
-
-              return out;
-            } catch (err) {
-              console.error("❌ Normalize API error:", err);
-              return rawText;
-            }
-          }
-
-
-
-
-
-
-
-          // Viết lại buildItemChunks
-          async function buildItemChunks(items, maxCharsPerChunk = 200, pageNum = currentPage) {
-            const chunks = [];
-            let startIdx = 0;
-
-            const isPunctuationEnd = (text) => {
-              const t = text.trim();
-              return [".", ",", ";", ":", "!", "?"].includes(t) ||
-                     [".", ",", ";", ":", "!", "?"].some(p => t.endsWith(p)) ||
-                     t.includes("\n");
-            };
-
-            while (startIdx < items.length) {
-              let accLen = 0;
-              let endIdx = startIdx - 1;
-              let lastPunctIdx = -1;
-
-              for (let i = startIdx; i < items.length; i++) {
-                const word = items[i].text;
-                const addLen = word.length + (i > startIdx ? 1 : 0);
-                if (accLen + addLen > maxCharsPerChunk) break;
-
-                accLen += addLen;
-                endIdx = i;
-                if (isPunctuationEnd(word)) lastPunctIdx = i;
-              }
-
-              if (lastPunctIdx >= startIdx) endIdx = lastPunctIdx;
-              if (endIdx < startIdx) endIdx = startIdx;
-
-              const textForHighlight = items.slice(startIdx, endIdx + 1).map(it => it.text).join(" ");
-              const textForTTS = items.slice(startIdx, endIdx + 1).map(it => it.text).join(" ");
-
-              // 👉 Gọi normalizeText với cache theo trang + chunk
-              const normalizedHighlight = await normalizeText(textForHighlight, pageNum, chunks.length);
-              const normalizedTTS = await normalizeText(textForTTS, pageNum, chunks.length);
-
-              chunks.push({
-                start: startIdx,
-                end: endIdx,
-                text: normalizedHighlight,
-                tts: normalizedTTS
-              });
-
-              startIdx = endIdx + 1;
-            }
-
-            return chunks;
-          }
-
-
-
-
-
-
-
-
-          function drawChunkOverlayByItems(chunk, items, overlay) {
-            // Xoá mọi highlight cũ để luôn chỉ còn 1 lớp
-            overlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
-            if (!chunk) return;
-
-            // Dùng pixel thật của canvas để khớp với viewport đã render
-            const dpr = window.devicePixelRatio || 1;
-
-            for (let i = chunk.start; i <= chunk.end; i++) {
-              const it = items[i];
-              if (!it) continue;
-
-              const box = document.createElement("div");
-              box.className = "highlight-box";
-
-              // Nhân với dpr để khớp vị trí canvas
-              box.style.left   = (it.x     * dpr) + "px";
-              box.style.top    = (it.y     * dpr) + "px";
-              box.style.width  = (it.width * dpr) + "px";
-              box.style.height = (it.height* dpr) + "px";
-
-              overlay.appendChild(box);
-            }
-          }
-
-
-          // ====== Render timeline số đoạn (thay marker) ======
-          function renderChunkTimeline(chunks, items) {
-            const timeline = document.getElementById("chunkTimeline");
-            timeline.innerHTML = "";
-
-            chunks.forEach((chunk, i) => {
-              const block = document.createElement("div");
-              block.className = "chunk-block";
-              block.textContent = i + 1; // chỉ hiện số thứ tự
-
-              block.addEventListener("click", () => {
-                stopAudio();
-                timeline.querySelectorAll(".chunk-block").forEach(el => el.classList.remove("active"));
-                block.classList.add("active");
-                playChunkFromIndex(i, chunks, items);
-              });
-
-              timeline.appendChild(block);
-            });
-          }
-
-          function setActiveChunkBlock(index) {
-            const blocks = document.querySelectorAll("#chunkTimeline .chunk-block");
-            blocks.forEach(el => el.classList.remove("active"));
-            if (blocks[index]) blocks[index].classList.add("active");
-          }
-
-          // ====== Reader Mode ======
-          // ====== Reader Mode ======
-          async function showTextView(pageNum, chunks, items) {
-            const textView = document.getElementById("textView");
-            textView.innerHTML = "";
-
-            chunks.forEach((chunk, i) => {
-              const span = document.createElement("span");
-              span.className = "chunk-span";
-              span.dataset.idx = i;
-
-              // 👉 Dùng text đã chuẩn hóa từ chunk.tts
-              span.textContent = chunk.tts;
-
-              textView.appendChild(span);
-              textView.appendChild(document.createTextNode(" "));
-            });
-
-            textView.style.setProperty('--readerFont', readerFontPx + "px");
-            textView.style.display = "block";
-            document.body.classList.add("reader-active");
-          }
-
-
-          function setActiveChunkInTextView(i) {
-            document.querySelectorAll(".chunk-span").forEach(el => el.classList.remove("active"));
-            const el = document.querySelector(`.chunk-span[data-idx="${i}"]`);
-            if (el) el.classList.add("active");
-          }
-
-
-
-
-
-          // ====== Đọc toàn bộ trang ======
-          async function readCurrentPage() {
-            if (!pdfDoc) return;
-            stopAudio();
-
-            const page = await pdfDoc.getPage(currentPage);
-            const scale = 1.5;
-            const viewport = page.getViewport({ scale });
-            const textContent = await page.getTextContent();
-
-            let items = getItemsWithBoxes(textContent, viewport);
-            if (!items.length) {
-              alert('Trang này không có văn bản (có thể là ảnh scan).');
-              return;
-            }
-
-            items = normalizeItems(items);
-            const chunks = await buildItemChunks(items, 200);
-
-            // normalize từng chunk và cache
-            for (let i = 0; i < chunks.length; i++) {
-              chunks[i].text = await normalizeText(chunks[i].text, currentPage, i);
-            }
-
-            renderChunkTimeline(chunks, items);
-
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            let stopRequested = false;
-            let currentSource = null;
-            let bufferQueue = [];
-
-            async function fetchBuffer(snippet) {
-              const url = `/tts?q=${encodeURIComponent(snippet)}`;
-              const resp = await fetch(url);
-              const arrayBuffer = await resp.arrayBuffer();
-              return await audioCtx.decodeAudioData(arrayBuffer);
-            }
-
-            async function prefillQueue(startIndex, count = 3) {
-              for (let j = 0; j < count && startIndex + j < chunks.length; j++) {
-                bufferQueue.push(await fetchBuffer(chunks[startIndex + j].text));
-              }
-            }
-
-            async function playOne(i) {
-              if (stopRequested || i >= chunks.length) return;
-              if (bufferQueue.length === 0) {
-                bufferQueue.push(await fetchBuffer(chunks[i].text));
-              }
-              const buffer = bufferQueue.shift();
-
-              const source = audioCtx.createBufferSource();
-              source.buffer = buffer;
-              source.playbackRate.value = playbackRate;
-              source.connect(audioCtx.destination);
-
-              if (readerMode) {
-                setActiveChunkInTextView(i);
-              } else {
-                drawChunkOverlayByItems(chunks[i], items, highlightOverlay);
-                setActiveChunkBlock(i);
-              }
-
-              source.onended = () => {
-                if (!stopRequested) {
-                  if (i + 3 < chunks.length) {
-                    fetchBuffer(chunks[i + 3].text).then(buf => bufferQueue.push(buf));
-                  }
-                  playOne(i + 1);
-                }
-              };
-
-              source.start();
-              currentSource = source;
-            }
-
-            await prefillQueue(0, 3);
-            playOne(0);
-
-            stopAudio = function() {
-              stopRequested = true;
-              bufferQueue = [];
-              if (currentSource) {
-                try { currentSource.stop(); } catch(e) {}
-                currentSource = null;
-              }
-              if (audioCtx) {
-                try { audioCtx.close(); } catch(e) {}
-                audioCtx = null;
-              }
-              highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
-            }
-          }
-
-          async function renderTextView(pageNum) {
-            const page = await pdfDoc.getPage(pageNum);
-            const scale = 1.5;
-            const viewport = page.getViewport({ scale });
-            const textContent = await page.getTextContent();
-
-            let items = getItemsWithBoxes(textContent, viewport);
-            items = normalizeItems(items);
-            const chunks = await buildItemChunks(items, 200);
-
-            for (let i = 0; i < chunks.length; i++) {
-              chunks[i].text = await normalizeText(chunks[i].text, pageNum, i);
-            }
-
-            const textView = document.getElementById("textView");
-            textView.innerHTML = "";
-            chunks.forEach((chunk, i) => {
-              const span = document.createElement("span");
-              span.className = "chunk-span";
-              span.dataset.idx = i;
-              span.textContent = chunk.text;
-              textView.appendChild(span);
-              textView.appendChild(document.createTextNode(" "));
-            });
-          }
-
-
-
-
-
-
-
-          // ====== Render marker ở lề ======
-          function renderChunkMarkers(chunks, items) {
-            markerOverlay.innerHTML = "";
-            const dpr = window.devicePixelRatio || 1;
-
-            const OFFSET_LEFT = -35;   // đẩy ra ngoài lề trái
-            const ICON_SIZE   = 28;    // kích thước vùng chạm
-
-            chunks.forEach((chunk, i) => {
-              const firstIt = items[chunk.start];
-              if (!firstIt) return;
-
-              const marker = document.createElement("div");
-              marker.className = "chunk-marker";
-              marker.textContent = "▶";
-
-              // Lấy toạ độ item đầu tiên
-              const leftPx = (firstIt.x + OFFSET_LEFT) * dpr;
-              const topPx  = (firstIt.y + firstIt.height / 2) * dpr;
-
-              marker.style.left = leftPx + "px";
-              marker.style.top  = (topPx - ICON_SIZE / 2) + "px";
-
-              marker.style.width = ICON_SIZE + "px";
-              marker.style.height = ICON_SIZE + "px";
-              marker.style.lineHeight = ICON_SIZE + "px";
-              marker.style.fontSize = "22px";
-
-              marker.addEventListener("click", () => {
-                playChunkFromIndex(i, chunks, items);
-              });
-
-              markerOverlay.appendChild(marker);
-            });
-          }
-
-
-
-
-          // ====== Đọc từ đoạn bất kỳ ======
-          async function playChunkFromIndex(startIndex, chunks, items) {
-            stopAudio();
-
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            let stopRequested = false;
-            let currentSource = null;
-            let bufferQueue = [];
-
-            async function fetchBuffer(snippet) {
-              const url = `/tts?q=${encodeURIComponent(snippet)}`;
-              const resp = await fetch(url);
-              const arrayBuffer = await resp.arrayBuffer();
-              return await audioCtx.decodeAudioData(arrayBuffer);
-            }
-
-            async function prefillQueue(startIndex, count = 3) {
-              for (let j = 0; j < count && startIndex + j < chunks.length; j++) {
-                bufferQueue.push(await fetchBuffer(chunks[startIndex + j].text));
-              }
-            }
-
-            async function playOne(i) {
-              if (stopRequested || i >= chunks.length) return;
-
-              if (bufferQueue.length === 0) {
-                bufferQueue.push(await fetchBuffer(chunks[i].text));
-              }
-              const buffer = bufferQueue.shift();
-
-              const source = audioCtx.createBufferSource();
-              source.buffer = buffer;
-              source.playbackRate.value = playbackRate;
-              source.connect(audioCtx.destination);
-
-              if (readerMode) {
-                setActiveChunkInTextView(i);
-              } else {
-                drawChunkOverlayByItems(chunks[i], items, highlightOverlay);
-                setActiveChunkBlock(i);
-              }
-
-
-              source.onended = () => {
-                if (!stopRequested) {
-                  if (i + 3 < chunks.length) {
-                    fetchBuffer(chunks[i + 3].text).then(buf => bufferQueue.push(buf));
-                  }
-                  playOne(i + 1);
-                }
-              };
-
-              source.start();
-              currentSource = source;
-            }
-
-            await prefillQueue(startIndex, 3);
-            playOne(startIndex);
-
-            stopAudio = function() {
-              stopRequested = true;
-              bufferQueue = [];
-              if (currentSource) {
-                try { currentSource.stop(); } catch(e) {}
-                currentSource = null;
-              }
-              if (audioCtx) {
-                try { audioCtx.close(); } catch(e) {}
-                audioCtx = null;
-              }
-              highlightOverlay.querySelectorAll(".highlight-box").forEach(el => el.remove());
-            }
-          }
-
-
-
-            // ====== Nút điều khiển ======
-          speedDownBtn.addEventListener('click', () => {
-            playbackRate = Math.max(0.5, playbackRate - 0.25); // không nhỏ hơn 0.5x
-            document.getElementById("speedInfo").textContent = `Tốc độ: ${playbackRate.toFixed(2)}x`;
-          });
-
-          speedUpBtn.addEventListener('click', () => {
-            playbackRate = Math.min(2.0, playbackRate + 0.25); // không lớn hơn 2x
-            document.getElementById("speedInfo").textContent = `Tốc độ: ${playbackRate.toFixed(2)}x`;
-          });
-
-          
-          prevBtn.addEventListener('click', async () => {
-            if (!pdfDoc || currentPage <= 1) return;
-            currentPage--;
-            stopAudio();
-            document.getElementById("chunkTimeline").innerHTML = "";
-            await renderPage(currentPage);
-            updatePageInfo();
-            flipSound.currentTime = 0; flipSound.play();
-
-            // 👉 nếu đang ở chế độ dễ đọc thì dựng lại text cho trang mới
-            if (readerMode) {
-              await renderTextView(currentPage);
-            }
-          });
-
-          nextBtn.addEventListener('click', async () => {
-            if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
-            currentPage++;
-            stopAudio();
-            document.getElementById("chunkTimeline").innerHTML = "";
-            await renderPage(currentPage);
-            updatePageInfo();
-            flipSound.currentTime = 0; flipSound.play();
-
-            // 👉 nếu đang ở chế độ dễ đọc thì dựng lại text cho trang mới
-            if (readerMode) {
-              await renderTextView(currentPage);
-            }
-          });
-
-          readBtn.addEventListener('click', () => {
-            unlockAudio();
-            readCurrentPage();   // nút đọc vẫn gọi readCurrentPage để đọc toàn bộ trang
-          });
-
-          pauseBtn.addEventListener('click', () => {
-            if (audioCtx && audioCtx.state === "running") audioCtx.suspend();
-          });
-
-          resumeBtn.addEventListener('click', () => {
-            if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
-          });
-
-
-            // Swipe (mobile)
-            let touchStartX = 0;
-            canvas.addEventListener('touchstart', (e) => {
-              touchStartX = e.changedTouches[0].screenX;
-            });
-          canvas.addEventListener('touchend', async (e) => {
-            const touchEndX = e.changedTouches[0].screenX;
-            const deltaX = touchEndX - touchStartX;
-            if (Math.abs(deltaX) < 50) return;
-
-            if (deltaX < 0 && currentPage < pdfDoc.numPages) {
-              currentPage++;
-              stopAudio();
-              document.getElementById("chunkTimeline").innerHTML = "";
-              await renderPage(currentPage);
-              updatePageInfo();
-              flipSound.currentTime = 0; flipSound.play();
-
-              // 👉 thêm đoạn này
-              if (readerMode) {
-                readCurrentPage();
-              }
-            } else if (deltaX > 0 && currentPage > 1) {
-              currentPage--;
-              stopAudio();
-              document.getElementById("chunkTimeline").innerHTML = "";
-              await renderPage(currentPage);
-              updatePageInfo();
-              flipSound.currentTime = 0; flipSound.play();
-
-              // 👉 thêm đoạn này
-              if (readerMode) {
-                readCurrentPage();
-              }
-            }
-          });
-
-
-            // Mouse drag (desktop)
-            let startX = 0;
-            canvas.addEventListener('mousedown', (e) => {
-              startX = e.clientX;
-            });
-            canvas.addEventListener('mouseup', async (e) => {
-              const endX = e.clientX;
-              const deltaX = endX - startX;
-              if (Math.abs(deltaX) < 80) return;
-              if (deltaX < 0 && currentPage < pdfDoc.numPages) {
-                currentPage++;
-                stopAudio();
-                document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
-                await renderPage(currentPage);
-                updatePageInfo();
-                flipSound.currentTime = 0; flipSound.play();
-              } else if (deltaX > 0 && currentPage > 1) {
-                currentPage--;
-                stopAudio();
-                document.getElementById("chunkTimeline").innerHTML = ""; // xoá timeline cũ
-                await renderPage(currentPage);
-                updatePageInfo();
-                flipSound.currentTime = 0; flipSound.play();
-              }
-            });
-
-            // Khi xoay ngang/dọc
-            window.addEventListener('orientationchange', () => {
-              if (!pdfDoc) return;
-              renderPage(currentPage).then(() => {
-                updatePageInfo();
-                if (audioCtx && audioCtx.state === "running") {
-                  resyncOverlayScale();
-                }
-              });
-            });
+        });
+      });
 
 // Khi thay đổi kích thước cửa sổ
 window.addEventListener('resize', () => {
-  if (!pdfDoc) return;
-  resyncOverlayScale();
+if (!pdfDoc) return;
+resyncOverlayScale();
 });
 
 // ====== Easy Reading Mode ======
 let readerMode = false;
 let readerFontPx = 18;
 
-          function groupItemsByLine(items, lineGap = 6) {
-            const lines = [];
-            let currentLine = [];
-            let prevY = null;
+    function groupItemsByLine(items, lineGap = 6) {
+      const lines = [];
+      let currentLine = [];
+      let prevY = null;
 
-            for (const it of items) {
-              if (prevY !== null && Math.abs(it.y - prevY) > lineGap) {
-                if (currentLine.length) lines.push(currentLine);
-                currentLine = [];
-              }
-              currentLine.push(it);
-              prevY = it.y;
-            }
-            if (currentLine.length) lines.push(currentLine);
-            return lines;
-          }
+      for (const it of items) {
+        if (prevY !== null && Math.abs(it.y - prevY) > lineGap) {
+          if (currentLine.length) lines.push(currentLine);
+          currentLine = [];
+        }
+        currentLine.push(it);
+        prevY = it.y;
+      }
+      if (currentLine.length) lines.push(currentLine);
+      return lines;
+    }
 
-          async function showTextView(pageNum) {
-            const page = await pdfDoc.getPage(pageNum);
-            const scale = 1.5;
-            const viewport = page.getViewport({ scale });
-            const textContent = await page.getTextContent();
+    async function showTextView(pageNum) {
+      const page = await pdfDoc.getPage(pageNum);
+      const scale = 1.5;
+      const viewport = page.getViewport({ scale });
+      const textContent = await page.getTextContent();
 
-            let items = getItemsWithBoxes(textContent, viewport);
-            items = normalizeItems(items);
+      let items = getItemsWithBoxes(textContent, viewport);
+      items = normalizeItems(items);
 
-            const chunks = await buildItemChunks(items, 200); // ✅ Đảm bảo là mảng
+      const chunks = await buildItemChunks(items, 200); // ✅ Đảm bảo là mảng
 
-            const textView = document.getElementById("textView");
-            textView.innerHTML = "";
+      const textView = document.getElementById("textView");
+      textView.innerHTML = "";
 
-            chunks.forEach((chunk, i) => {
-              const span = document.createElement("span");
-              span.className = "chunk-span";
-              span.dataset.idx = i;
-              span.textContent = chunk.tts || ""; // ✅ Luôn là chuỗi
-              textView.appendChild(span);
-              textView.appendChild(document.createTextNode(" "));
-            });
+      chunks.forEach((chunk, i) => {
+        const span = document.createElement("span");
+        span.className = "chunk-span";
+        span.dataset.idx = i;
+        span.textContent = chunk.tts || ""; // ✅ Luôn là chuỗi
+        textView.appendChild(span);
+        textView.appendChild(document.createTextNode(" "));
+      });
 
-            textView.style.setProperty('--readerFont', readerFontPx + "px");
-            textView.style.display = "block";
-            document.body.classList.add("reader-active");
-          }
+      textView.style.setProperty('--readerFont', readerFontPx + "px");
+      textView.style.display = "block";
+      document.body.classList.add("reader-active");
+    }
 
 
-          function setActiveChunkInTextView(i) {
-            document.querySelectorAll(".chunk-span").forEach(el => el.classList.remove("active"));
-            const el = document.querySelector(`.chunk-span[data-idx="${i}"]`);
-            if (el) {
-              el.classList.add("active");
-              el.scrollIntoView({ behavior: "smooth", block: "center" });
-            }
-          }
+    function setActiveChunkInTextView(i) {
+      document.querySelectorAll(".chunk-span").forEach(el => el.classList.remove("active"));
+      const el = document.querySelector(`.chunk-span[data-idx="${i}"]`);
+      if (el) {
+        el.classList.add("active");
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
 
 function hideTextView() {
-  const textView = document.getElementById("textView");
-  textView.style.display = "none";
-  textView.innerHTML = "";
-  document.body.classList.remove("reader-active");
+const textView = document.getElementById("textView");
+textView.style.display = "none";
+textView.innerHTML = "";
+document.body.classList.remove("reader-active");
 }
 
 document.getElementById("readerToggleBtn").addEventListener("click", async () => {
-  if (!pdfDoc) return;
-  stopAudio();
-  document.getElementById("chunkTimeline").innerHTML = "";
-  if (!readerMode) {
-    readerMode = true;
-    await showTextView(currentPage);
-  } else {
-    readerMode = false;
-    hideTextView();
-    await renderPage(currentPage);
-  }
+if (!pdfDoc) return;
+stopAudio();
+document.getElementById("chunkTimeline").innerHTML = "";
+if (!readerMode) {
+readerMode = true;
+await showTextView(currentPage);
+} else {
+readerMode = false;
+hideTextView();
+await renderPage(currentPage);
+}
 });
 
 document.getElementById("zoomInTextBtn").addEventListener("click", () => {
-  readerFontPx = Math.min(readerFontPx + 2, 36);
-  document.getElementById("textView").style.setProperty('--readerFont', readerFontPx + "px");
+readerFontPx = Math.min(readerFontPx + 2, 36);
+document.getElementById("textView").style.setProperty('--readerFont', readerFontPx + "px");
 });
 
 document.getElementById("zoomOutTextBtn").addEventListener("click", () => {
-  readerFontPx = Math.max(readerFontPx - 2, 12);
-  document.getElementById("textView").style.setProperty('--readerFont', readerFontPx + "px");
+readerFontPx = Math.max(readerFontPx - 2, 12);
+document.getElementById("textView").style.setProperty('--readerFont', readerFontPx + "px");
 });
 
 }); // end DOMContentLoaded
